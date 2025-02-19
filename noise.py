@@ -1,12 +1,14 @@
-from talon import noise, ctrl
+from talon import noise, ctrl, scope
 
 def on_pop(active):
-    ctrl.mouse_click(button=0)
-    print ("on_pop", active)
+    if "command" in scope.get("mode"):
+        ctrl.mouse_click(button=0)
+        print ("on_pop", active)
 
 def on_hiss(active):
-    print ("on_hiss", active)
-    ctrl.mouse_click(button=1)
+    if "command" in scope.get("mode"):
+        ctrl.mouse_click(button=1)
+        print ("on_hiss", active)
 
 noise.register("pop", on_pop)
-#noise.register("hiss", on_hiss)
+noise.register("hiss", on_hiss)
