@@ -1,0 +1,8 @@
+- Refactor how the controller stuff is turned on/off
+    - allow the threads to be started/stopped when the remapping is desired
+	- use HidHideCLI to hide the physical controller when turned on
+	- remove the virtual gamepad when turned off
+	- allow some selection for specific game bindings
+	
+- Add additional noises (parrot?)
+
