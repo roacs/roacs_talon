@@ -1,7 +1,9 @@
-- Add layouts for noises in the same vein as footpedal
-- Refactor how layouts are done so we can specify things like "pop", "hiss", "foot_left", etc.
-  make names for the foot pedals available, allow things other than controller actions?
+- Can we combine the foot/noise layout into a single entry so a cycle picks the single entry with
+  both layouts, instead of cycling both?
 
 - Add additional noises (parrot?)
+
+- Add words or phrases for certain games that will take actions?
+  e.g. up = dpad_up
 
 - Experiment with eye tracking

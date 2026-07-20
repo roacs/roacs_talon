@@ -48,5 +48,5 @@ class Actions:
             current_layout_index = 0
 
         current_layout = layout_names[current_layout_index]
-        print(current_layout)
+        print("Footpedal layout " + current_layout)
         app.notify("Footpedal layout " + current_layout)
