@@ -1,8 +1,8 @@
 from talon import noise, actions
-import sys
+from .xbox_buttons import Button
 
 def on_pop(active):
-    actions.user.x_button_press()
+    actions.user.controller_press_button(Button.X)
 
 noise.register("pop", on_pop)
 
