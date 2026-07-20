@@ -3,7 +3,7 @@ import threading
 import time
 import vgamepad as vg
 from inputs import get_gamepad
-from .xbox_buttons import Button
+from .xbox_buttons import Button, Trigger
 
 mod = Module()
 
@@ -28,7 +28,7 @@ physical_axes_state = {
 }
 
 external_state = {
-    button.value: False for button in Button
+    item.value: False for item in list(Button) + list(Trigger)
 }
 
 virtual_button_map = {
@@ -108,8 +108,9 @@ def output_thread():
 
             gamepad.left_joystick(axes["LX"], axes["LY"])
             gamepad.right_joystick(axes["RX"], axes["RY"])
-            gamepad.left_trigger(axes["LT"])
-            gamepad.right_trigger(axes["RT"])
+
+            gamepad.left_trigger(255 if external[Trigger.LEFT.value] else axes["LT"])
+            gamepad.right_trigger(255 if external[Trigger.RIGHT.value] else axes["RT"])
 
             gamepad.update()
 
@@ -119,11 +120,11 @@ def output_thread():
 @mod.action_class
 class Actions:
 
-    def controller_button_down(button: Button):
+    def controller_button_down(button: Button | Trigger):
         """Press virtual controller button."""
         external_state[button.value] = True
 
-    def controller_button_up(button: Button):
+    def controller_button_up(button: Button | Trigger):
         """Release virtual controller button."""
         external_state[button.value] = False
 

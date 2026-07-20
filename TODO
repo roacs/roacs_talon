@@ -1,7 +1,6 @@
+- Add layouts for noises in the same vein as footpedal
 - Refactor how layouts are done so we can specify things like "pop", "hiss", "foot_left", etc.
   make names for the foot pedals available, allow things other than controller actions?
-
-- Add ability to foot pedal triggers in gamepad.py
 
 - Add additional noises (parrot?)
 

@@ -17,3 +17,8 @@ class Button(Enum):
     DPAD_DOWN = "DPAD_DOWN"
     DPAD_LEFT = "DPAD_LEFT"
     DPAD_RIGHT = "DPAD_RIGHT"
+
+@dataclass
+class Trigger(Enum):
+    LEFT = "LT"
+    RIGHT = "RT"

@@ -1,5 +1,5 @@
 from talon import Module, app, actions
-from .xbox_buttons import Button
+from .xbox_buttons import Button, Trigger
 
 mod = Module()
 
@@ -8,7 +8,7 @@ layouts = {
         "f13": Button.X,
     },
     "grounded": {
-        "f13": Button.A,
+        "f13": Trigger.RIGHT,
         "f14": Button.X,
     },
     "default": {
