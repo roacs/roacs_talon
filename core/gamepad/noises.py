@@ -6,7 +6,7 @@ mod = Module()
 layouts = {
     "path_of_exile": {
         "pop": Button.X,
-        "hiss": None,
+        "hiss": Button.Y,
     },
     "grounded": {
         "pop": None,
@@ -42,11 +42,13 @@ class Actions:
 # Noise listeners
 
 def on_pop(active):
+    print("pop")
     button = layouts[current_layout].get("pop")
     if button:
         actions.user.controller_button_press(button)
 
 def on_hiss(active):
+    print("hiss")
     button = layouts[current_layout].get("hiss")
     if button:
         actions.user.controller_button_press(button)

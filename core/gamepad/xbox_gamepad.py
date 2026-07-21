@@ -11,8 +11,8 @@ gamepad = vg.VX360Gamepad()
 gamepad.reset()
 gamepad.update()
 
-controller_state_lock = threading.Lock()
-gamepad_lock = threading.Lock()
+physical_state_lock = threading.Lock()
+external_state_lock = threading.Lock()
 
 physical_button_state = {
     button.value: False for button in Button
@@ -27,8 +27,8 @@ physical_axes_state = {
     "RT": 0,
 }
 
-external_state = {
-    item.value: False for item in list(Button) + list(Trigger)
+external_state_counters = {
+    item.value: 0 for item in list(Button) + list(Trigger)
 }
 
 virtual_button_map = {
@@ -68,7 +68,7 @@ def input_thread():
     while True:
         events = get_gamepad()
 
-        with controller_state_lock:
+        with physical_state_lock:
             for event in events:
                 if event.code in button_map:
                     physical_button_state[button_map[event.code]] = bool(event.state)
@@ -94,27 +94,28 @@ def input_thread():
 
 def output_thread():
     while True:
-        with controller_state_lock:
+        with physical_state_lock:
             physical = physical_button_state.copy()
-            external = external_state.copy()
             axes = physical_axes_state.copy()
 
-        with gamepad_lock:
-            for name, button in virtual_button_map.items():
-                if physical[name] or external[name]:
-                    gamepad.press_button(button)
-                else:
-                    gamepad.release_button(button)
+        with external_state_lock:
+            external = external_state_counters.copy()
 
-            gamepad.left_joystick(axes["LX"], axes["LY"])
-            gamepad.right_joystick(axes["RX"], axes["RY"])
+        for name, button in virtual_button_map.items():
+            if physical[name] or external[name] > 0:
+                gamepad.press_button(button)
+            else:
+                gamepad.release_button(button)
 
-            gamepad.left_trigger(255 if external[Trigger.LEFT.value] else axes["LT"])
-            gamepad.right_trigger(255 if external[Trigger.RIGHT.value] else axes["RT"])
+        gamepad.left_joystick(axes["LX"], axes["LY"])
+        gamepad.right_joystick(axes["RX"], axes["RY"])
 
-            gamepad.update()
+        gamepad.left_trigger(255 if external[Trigger.LEFT.value] > 0 else axes["LT"])
+        gamepad.right_trigger(255 if external[Trigger.RIGHT.value] > 0 else axes["RT"])
 
-    time.sleep(0.01)
+        gamepad.update()
+
+        time.sleep(0.01)
 
 
 @mod.action_class
@@ -122,20 +123,29 @@ class Actions:
 
     def controller_button_down(button: Button | Trigger):
         """Press virtual controller button."""
-        external_state[button.value] = True
+        increment_external_state(button.value)
 
     def controller_button_up(button: Button | Trigger):
         """Release virtual controller button."""
-        external_state[button.value] = False
+        decrement_external_state(button.value)
 
-    def controller_button_press(press_button: Button):
+    def controller_button_press(button: Button | Trigger):
         """Press virtual controller button."""
-        with gamepad_lock:
-            gamepad.press_button(button=virtual_button_map.get(press_button.value))
-            gamepad.update()
-            time.sleep(0.05)
-            gamepad.release_button(button=virtual_button_map.get(press_button.value))
-            gamepad.update()
+        increment_external_state(button.value)
+        threading.Timer(
+            0.05,
+            decrement_external_state,
+            args=[button.value],
+        ).start()
+
+
+def increment_external_state(name):
+    with external_state_lock:
+        external_state_counters[name] += 1
+
+def decrement_external_state(name):
+    with external_state_lock:
+        external_state_counters[name] = max(0, external_state_counters[name] - 1)
 
 
 threading.Thread(
