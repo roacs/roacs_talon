@@ -1,4 +1,4 @@
-from talon import Module, app
+from talon import Module, app, cron
 import threading
 import time
 import vgamepad as vg
@@ -131,12 +131,9 @@ class Actions:
 
     def controller_button_press(button: Button | Trigger):
         """Press virtual controller button."""
-        increment_external_state(button.value)
-        threading.Timer(
-            0.05,
-            decrement_external_state,
-            args=[button.value],
-        ).start()
+        if button:
+            increment_external_state(button.value)
+            cron.after("50ms", lambda: decrement_external_state(button.value))
 
 
 def increment_external_state(name):

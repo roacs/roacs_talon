@@ -1,0 +1,57 @@
+{
+    "click": {
+        "sounds": ["Palatal Click"],
+        "threshold": {
+            ">power": 12,
+            ">probability": 0.99
+        },
+        "throttle": {
+            "click": 0.1
+        }
+    },
+    "cluck": {
+        "sounds": ["cluck"],
+        "threshold": {
+            ">power": 40,
+            ">probability": 0.999
+        },
+        "throttle": {
+            "cluck": 0.2,
+            "pop": 0.2
+        }
+    },
+    "shush": {
+        "sounds": ["shush"],
+        "threshold": {
+            ">power": 20,
+            ">probability": 0.95
+        },
+        "graceperiod": 0.05,
+        "grace_threshold": {
+            ">power": 10
+        }
+    },
+    "hiss": {
+        "sounds": ["hiss"],
+        "threshold": {
+            ">power": 20,
+            ">probability": 0.95
+        },
+        "graceperiod": 0.05,
+        "grace_threshold": {
+            ">power": 10
+        }
+    },
+    "speech": {
+        "sounds": ["speech"],
+        "threshold": {
+            ">power": 15,
+            ">probability": 0.95
+        },
+        "throttle": {
+            "pop": 0.3,
+            "shush": 0.3,
+            "hiss": 0.3
+        }
+    }
+}

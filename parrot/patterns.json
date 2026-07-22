@@ -1,0 +1,12 @@
+{
+    "click": {
+        "sounds": ["Palatal Click"],
+        "threshold": {
+            ">power": 12,
+            ">probability": 0.99
+        },
+        "throttle": {
+            "click": 0.1
+        }
+    }
+}
