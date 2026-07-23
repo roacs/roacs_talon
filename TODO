@@ -6,9 +6,6 @@
 - Add additional noises (parrot?)
   https://gist.github.com/ghouston/609b771716c846029c8504ac70fd1de8
 
-- Add words or phrases for certain games that will take actions?
-  e.g. up = dpad_up
-       regex = load regex into clipboard
-- Have certain commands available when certain games are running?
+- Can we make the game specific commands only available when that game is running?
 
 - Experiment with eye tracking

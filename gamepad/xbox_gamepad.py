@@ -123,26 +123,34 @@ class Actions:
 
     def controller_button_down(button: Button | Trigger):
         """Press virtual controller button."""
-        increment_external_state(button.value)
+        increment_external_state([button.value])
 
     def controller_button_up(button: Button | Trigger):
         """Release virtual controller button."""
-        decrement_external_state(button.value)
+        decrement_external_state([button.value])
 
-    def controller_button_press(button: Button | Trigger):
-        """Press virtual controller button."""
-        if button:
-            increment_external_state(button.value)
-            cron.after("50ms", lambda: decrement_external_state(button.value))
+    def controller_button_press(buttons: list[Button | Trigger]):
+        """Press virtual controller buttons."""
+        if buttons is None:
+            return
+        if not isinstance(buttons, list):
+            buttons = [buttons]
+
+        if buttons:
+            values = [button.value for button in buttons]
+            increment_external_state(values)
+            cron.after("50ms", lambda: decrement_external_state(values))
 
 
-def increment_external_state(name):
+def increment_external_state(names):
     with external_state_lock:
-        external_state_counters[name] += 1
+        for name in names:
+            external_state_counters[name] += 1
 
-def decrement_external_state(name):
+def decrement_external_state(names):
     with external_state_lock:
-        external_state_counters[name] = max(0, external_state_counters[name] - 1)
+        for name in names:
+            external_state_counters[name] = max(0, external_state_counters[name] - 1)
 
 
 threading.Thread(
