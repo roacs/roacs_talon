@@ -1,1 +1,0 @@
-parrot(click): print("click")

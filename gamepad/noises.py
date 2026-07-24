@@ -5,16 +5,19 @@ mod = Module()
 
 layouts = {
     "path_of_exile": {
-        "pop": Button.X,
-        "hiss": Button.Y,
+        "pop": Button.Y,
+        "hiss": None,
+        "whistle": None,
     },
     "grounded": {
         "pop": None,
         "hiss": None,
+        "whistle": None,
     },
     "default": {
         "pop": None,
         "hiss": None,
+        "whistle": None,
     },
 }
 
@@ -38,8 +41,15 @@ class Actions:
         print("Noise layout " + current_layout)
         app.notify("Noise layout " + current_layout)
 
+    def parrot_noise_action(action: str):
+        """Parrot callback."""
+        print("parrot " + action)
+        button = layouts[current_layout].get(action)
+        if button:
+            actions.user.controller_button_press(button)
+        
 
-# Noise listeners
+# Talon Noise listeners
 
 def on_pop(active):
     print("pop")

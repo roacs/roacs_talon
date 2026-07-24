@@ -25,3 +25,4 @@ noise.py and footpedal.py would import the loadout and perform the action(s) of 
 noise.py would define an enum of the available noises
 footpedal.py would define an enum of the available footpedal actions
 this is so we can define actions other than gamepad, like mouse/keyboard actions on a pop
+and also so the actions can be in one location

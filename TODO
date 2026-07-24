@@ -3,6 +3,9 @@
   Or, can we have more abstract maps where we map footpedal1/pop to a generic action which can be
   gamepad, keyboard/mouse, or other user defined actions?
 
+- Randomize the time buttons are externally pressed within a small window so it looks more like
+  natural input
+
 - Add additional noises (parrot?)
   https://gist.github.com/ghouston/609b771716c846029c8504ac70fd1de8
 

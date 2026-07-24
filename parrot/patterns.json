@@ -2,11 +2,22 @@
     "click": {
         "sounds": ["Palatal Click"],
         "threshold": {
-            ">power": 12,
-            ">probability": 0.99
+            ">power": 6,
+            ">probability": 0.80
         },
         "throttle": {
             "click": 0.1
+        }
+    },
+
+    "whistle": {
+        "sounds": ["Whistle"],
+        "threshold": {
+            ">power": 6,
+            ">probability": 0.99
+        },
+        "throttle": {
+            "whistle": 0.1
         }
     }
 }

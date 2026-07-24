@@ -55,8 +55,8 @@ button_map = {
     "BTN_NORTH": Button.Y.value,
     "BTN_TL": Button.LB.value,
     "BTN_TR": Button.RB.value,
-    "BTN_SELECT": Button.BACK.value,
-    "BTN_START": Button.START.value,
+    "BTN_SELECT": Button.START.value,  # These are mapped wrong for some reason
+    "BTN_START": Button.BACK.value,    # These are mapped wrong for some reason
     "BTN_THUMBL": Button.L3.value,
     "BTN_THUMBR": Button.R3.value,
 }
