@@ -8,21 +8,22 @@ For outputting to a virtual gamepad and reading from a physical controller
    - Devices -> Enable device hiding, select to hide the physical controller
 
 
-TODO description of footpedal setup and noise setup
-external + physical gamepad into virtual gamepad
-abstraction layer to map actions to enumerated externals (foot, noise_pop, etc.)
+Foot switches are set to use hidden function keys (F13-F24).  This maps those function
+keys to named actions for ease of use:
+  F13 - ikkegol dual twin foot switch left pedal
+  F14 - ikkegol dual twin foot switch right pedal
+  F15 - olympus rs31h/31n foot switch left pedal
+  F16 - olympus rs31h/31n foot switch center pedal
+  F17 - olympus rs31h/31n foot switch right pedal
+  F18 - olympus rs31h/31n foot switch top pedal
 
+There is an included olympus_rs31h.xml containing a template that can be loaded in 
+Olympus' FTSW tool to set the pedals to the right keys.  Can't be done through their
+tool GUI.
 
-create a loadout class where we can define action(s) for an enumerated list of things
-  FootPedal.F13 down -> actions.user.controller_button_down(Button.X),
-  FootPedal.F13 up   -> actions.user.controller_button_up(Button.X),
-  Noise.Pop -> actions.user.controller_press_button(Button.X),
-  Noise.Hiss -> mouse click
-  Noise.Click -> {multiple actions... hold LT and press X}
-  etc.
-}
-noise.py and footpedal.py would import the loadout and perform the action(s) of the current loadout
-noise.py would define an enum of the available noises
-footpedal.py would define an enum of the available footpedal actions
-this is so we can define actions other than gamepad, like mouse/keyboard actions on a pop
-and also so the actions can be in one location
+Footpedal actions and noise actions are defined in Module user actions.  For specific
+behavior, override those actions in a Context in a different file.
+
+TODO description of how the gamepad works with external + physical
+
+TODO need a way to only enable the voice buttons when in game mode, tag?

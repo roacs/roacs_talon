@@ -1,19 +1,21 @@
-from talon import Module, actions, ui
+from talon import Context, actions
+from ..gamepad.xbox_buttons import Button, Trigger
 
-mod = Module()
+ctx = Context()
+ctx.matches = r"""
+app: PathOfExileSteam.exe
+"""
 
-@mod.action_class
+@ctx.action_class("user")
 class Actions:
 
     def footpedal_ikkegol_dual_left_down():
         """pedal down"""
-        #print(ui.active_app().name)
-        pass
+        actions.user.controller_button_down(Button.X)
 
     def footpedal_ikkegol_dual_left_up():
         """pedal up"""
-        #print(ui.active_app().name)
-        pass
+        actions.user.controller_button_up(Button.X)
 
     def footpedal_ikkegol_dual_right_down():
         """pedal down"""
@@ -54,4 +56,3 @@ class Actions:
     def footpedal_olympus_top_up():
         """pedal up"""
         pass
-

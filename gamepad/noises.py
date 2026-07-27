@@ -1,69 +1,30 @@
-from talon import Module, app, noise, actions
-from .xbox_buttons import Button, Trigger
+from talon import Module, noise, actions
 
 mod = Module()
-
-layouts = {
-    "path_of_exile": {
-        "pop": Button.Y,
-        "hiss": None,
-        "whistle": None,
-    },
-    "grounded": {
-        "pop": None,
-        "hiss": None,
-        "whistle": None,
-    },
-    "default": {
-        "pop": None,
-        "hiss": None,
-        "whistle": None,
-    },
-}
-
-layout_names = list(layouts.keys())
-current_layout_index = 0
-current_layout = layout_names[0]
 
 @mod.action_class
 class Actions:
 
-    def cycle_noises_layout():
-        """Cycle noise layout."""
-        global current_layout_index
-        global current_layout
+    def noise_talon_pop():
+        """Talon pop noise"""
+        pass
+    
+    def noise_talon_hiss():
+        """Talon hiss noise"""
+        pass
 
-        current_layout_index += 1
-        if current_layout_index >= len(layout_names):
-            current_layout_index = 0
-
-        current_layout = layout_names[current_layout_index]
-        print("Noise layout " + current_layout)
-        app.notify("Noise layout " + current_layout)
-
-    def parrot_noise_action(action: str):
-        """Parrot callback."""
-        print("parrot " + action)
-        button = layouts[current_layout].get(action)
-        if button:
-            actions.user.controller_button_press(button)
+    def parrot_noise_whistle():
+        """Parrot whistle"""
+        pass
         
 
-# Talon Noise listeners
+# Talon Noise mapping 
 
 def on_pop(active):
-    print("pop")
-    button = layouts[current_layout].get("pop")
-    if button:
-        actions.user.controller_button_press(button)
+    actions.user.noise_talon_pop()
 
 def on_hiss(active):
-    print("hiss")
-    button = layouts[current_layout].get("hiss")
-    if button:
-        actions.user.controller_button_press(button)
-
-# Noise registrations
+    actions.user.noise_talon_hiss()
 
 noise.register("pop", on_pop)
 noise.register("hiss", on_hiss)

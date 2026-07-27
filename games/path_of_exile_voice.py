@@ -1,8 +1,6 @@
 from talon import Module, actions
 from ..gamepad.xbox_buttons import Button, Trigger
 
-mod = Module()
-
 #regex_names = {
 #    "gem": 
 #          r"Spec.*throw|d sand$|steelsk|tblink$|p slam$|^prec|^clari|sunder$|poac|ood ra|d stone$|^prid|ty of ele|^general|autoe|^autom|^cyclone$|crate$|^faster a|lifeta|cruel|melee ph.*sup|shoc.*wa.*rt|volat.*s|pulv|infused c|^inc.*crit|arrog|^assa|mark on",
@@ -23,8 +21,12 @@ regex_names = {
 
     "map": 
           r'"!gy|efl|eec|o al|non"',
+
+    "craft": 
+          r'"flaring|tempered|razor|dictator|emperor|conquer|merciless|tyrannical|cruel|infamy|celebration"'
 }
 
+mod = Module()
 
 @mod.action_class
 class Actions:
@@ -38,3 +40,6 @@ class Actions:
     def clear_filter():
         """Send vendor clear"""
         actions.user.controller_button_press([Button.L3, Button.DPAD_RIGHT])
+
+
+
