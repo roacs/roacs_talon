@@ -1,15 +1,16 @@
-from talon import Context, actions, cron
-from ..gamepad.xbox_buttons import Button, Trigger
+from talon import Module, Context, actions, cron
+from ..core.gamepad.xbox_buttons import Button, Trigger
+from .character_regexes import get_regex
 from functools import partial
 import random
 
 ctx = Context()
 ctx.matches = r"""
 app: PathOfExileSteam.exe
-app: Google Chrome
 """
+ctx.tags = ["user.game"]
 
-# Pressing buttons in a list in a cycle while job is running
+# Helper functions to press buttons in a list in sequence with a small delay between them
 
 pedal_jobs = {}
 
@@ -36,8 +37,39 @@ def stop_button_cycle(pedal_id):
         cron.cancel(job)
         pedal_jobs[pedal_id] = None
 
+# Game specific actions
 
-# Actions
+mod = Module()
+
+@mod.action_class
+class Actions:
+    def insert_regex_name(name: str):
+        """Insert a regex name"""
+        actions.user.controller_button_press([Button.L3, Button.DPAD_LEFT])
+        actions.sleep("50ms")
+        actions.clip.set_text(get_regex(name))
+        actions.edit.paste()
+
+    def clear_filter():
+        """Send vendor clear"""
+        actions.user.controller_button_press([Button.L3, Button.DPAD_RIGHT])
+
+# Overriden Contextualized Actions
+
+@ctx.action_class("user")
+class Actions:
+
+    def noise_talon_pop():
+        """Talon pop noise"""
+        actions.user.controller_button_press(Button.Y)
+    
+    def noise_talon_hiss():
+        """Talon hiss noise"""
+        pass
+
+    def parrot_noise_whistle():
+        """Parrot whistle"""
+        actions.user.controller_button_press(Button.A)
 
 @ctx.action_class("user")
 class Actions:

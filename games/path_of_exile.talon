@@ -1,4 +1,5 @@
 app: PathOfExileSteam.exe
+tag: user.game
 -
 # Vendor
 vendor gem : user.insert_regex_name("gem")
