@@ -1,4 +1,4 @@
-from talon import Module, noise, actions
+from talon import Module, noise, actions, ui
 
 mod = Module()
 
@@ -7,15 +7,15 @@ class Actions:
 
     def noise_talon_pop():
         """Talon pop noise"""
-        pass
+        print(f"pop with no context override in {ui.active_app().name}")
     
     def noise_talon_hiss():
         """Talon hiss noise"""
-        pass
+        print(f"hiss with no context override in {ui.active_app().name}")
 
     def parrot_noise_whistle():
         """Parrot whistle"""
-        pass
+        print(f"whistle with no context override in {ui.active_app().name}")
         
 
 # Talon Noise mapping 
@@ -28,3 +28,5 @@ def on_hiss(active):
 
 noise.register("pop", on_pop)
 noise.register("hiss", on_hiss)
+
+
