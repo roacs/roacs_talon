@@ -39,7 +39,7 @@ REGEXES = {
             r'"([rgb]-){2}[rgb]|-\w-|Runn|rint|me Sh"',
 
         Category.MAP:
-            r'"!gy|efl|eec|o al|non"',
+            r'"!nerg|ve p|eec|a d|o bl"',
 
         Category.CRAFT:
             r'"flaring|tempered|razor|dictator|emperor|conquer|merciless|tyrannical|cruel|infamy|celebration"'

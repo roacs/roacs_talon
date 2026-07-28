@@ -100,11 +100,11 @@ class Actions:
 
     def footpedal_olympus_center_down():
         """pedal down"""
-        pass
+        actions.key("alt:down")
 
     def footpedal_olympus_center_up():
         """pedal up"""
-        pass
+        actions.key("alt:up")
 
     def footpedal_olympus_right_down():
         """pedal down"""
