@@ -11,6 +11,10 @@ app: PathOfExileSteam.exe
 ctx.tags = ["user.game"]
 
 # Helper functions to press buttons in a list in sequence with a small delay between them
+# TODO just make this simple and actions.sleep between buttons
+
+DELAY_TIME_MIN=120
+DELAY_TIME_MAX=150
 
 pedal_jobs = {}
 
@@ -27,7 +31,7 @@ def button_list_cycle_step(pedal_id, buttons, delay_range, index):
         partial(button_list_cycle_step, pedal_id, buttons, delay_range, next_index)
     )
 
-def start_button_cycle(pedal_id, buttons, delay_range=(120, 160)):
+def start_button_cycle(pedal_id, buttons, delay_range=(DELAY_TIME_MIN, DELAY_TIME_MAX)):
     if pedal_jobs.get(pedal_id) is None:
         button_list_cycle_step(pedal_id, buttons, delay_range, index=0)
 
@@ -92,7 +96,7 @@ class Actions:
 
     def footpedal_olympus_left_down():
         """pedal down"""
-        start_button_cycle("olympus_left", [Button.X, Button.DPAD_UP])
+        start_button_cycle("olympus_left", [Button.X, Button.DPAD_LEFT])
 
     def footpedal_olympus_left_up():
         """pedal up"""
@@ -108,7 +112,7 @@ class Actions:
 
     def footpedal_olympus_right_down():
         """pedal down"""
-        start_button_cycle("olympus_right", [Button.X, Button.DPAD_DOWN])
+        start_button_cycle("olympus_right", [Button.X, Button.DPAD_RIGHT])
 
     def footpedal_olympus_right_up():
         """pedal up"""

@@ -9,14 +9,23 @@ class Category(str, Enum):
     GEM = "gem"
     VENDOR = "vendor"
     MAP = "map"
-    CRAFT = "craft"
-
 
 # SELECTED CHARACTER
 selected_character = Character.SLAYER_CYCLONE_329
 
+# non-character specific regexes
 
 REGEXES = {
+    "craft":
+        r'"flaring|tempered|dictator|emperor|conquer|merciless|tyrannical|cruel|celebration"',
+    "rog":
+        r'"of all|suppress|chaos res|profane|spine bow|ivory bow|bone bow|thicket bow|grove bow|short bow|l arrow|% increased maximum life|bone ring|293|173|throwing"'
+}
+
+
+# character specific regexes
+
+CHARACTER_REGEXES = {
     Character.LUMINARY_MERC_SUPPORT_329: {
         Category.GEM:
             r'"Spec.*throw|d sand$|steelsk|tblink$|p slam$|^prec|^clari|sunder$|poac|ood ra|d stone$|^prid|ty of ele|^general|autoe|^autom|^cyclone$|crate$|^faster a|lifeta|cruel|melee ph.*sup|shoc.*wa.*rt|volat.*s|pulv|infused c|^inc.*crit|arrog|^assa|mark on"',
@@ -26,9 +35,6 @@ REGEXES = {
 
         Category.MAP:
             r'"!gy|efl|eec|o al|non"',
-
-        Category.CRAFT:
-            r'"flaring|tempered|razor|dictator|emperor|conquer|merciless|tyrannical|cruel|infamy|celebration"'
     },
 
     Character.SLAYER_CYCLONE_329: {
@@ -40,9 +46,6 @@ REGEXES = {
 
         Category.MAP:
             r'"!nerg|ve p|eec|a d|o bl"',
-
-        Category.CRAFT:
-            r'"flaring|tempered|razor|dictator|emperor|conquer|merciless|tyrannical|cruel|infamy|celebration"'
     },
 }
 
@@ -50,6 +53,6 @@ REGEXES = {
 def get_regex(category: str) -> str | None:
     cat = Category._value2member_map_.get(category)
     if cat is None:
-        return None
+        return REGEXES.get(category)
 
-    return REGEXES[selected_character].get(cat)
+    return CHARACTER_REGEXES[selected_character].get(cat)

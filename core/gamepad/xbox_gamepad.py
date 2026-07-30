@@ -139,7 +139,7 @@ class Actions:
         if buttons:
             values = [button.value for button in buttons]
             increment_external_state(values)
-            cron.after("50ms", lambda: decrement_external_state(values))
+            cron.after("30ms", lambda: decrement_external_state(values))
 
 
 def increment_external_state(names):
