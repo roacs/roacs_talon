@@ -1,7 +1,6 @@
 from talon import Module, Context, actions, cron
 from ..core.gamepad.xbox_buttons import Button, Trigger
 from .character_regexes import get_regex
-from functools import partial
 import random
 
 ctx = Context()
@@ -10,36 +9,40 @@ app: PathOfExileSteam.exe
 """
 ctx.tags = ["user.game"]
 
-# Helper functions to press buttons in a list in sequence with a small delay between them
-# TODO just make this simple and actions.sleep between buttons
+# Methods to press buttons in a list in sequence with a small delay between them
 
-DELAY_TIME_MIN=120
-DELAY_TIME_MAX=150
+DELAY_TIME_MIN = 100
+DELAY_TIME_MAX = 130
 
 pedal_jobs = {}
+pedal_indices = {}
 
-def button_list_cycle_step(pedal_id, buttons, delay_range, index):
-    global pedal_jobs
-
+def button_cycle(pedal_id, buttons):
+    index = pedal_indices.get(pedal_id, 0)
     actions.user.controller_button_press(buttons[index])
+    pedal_indices[pedal_id] = (index + 1) % len(buttons)
 
-    next_index = (index + 1) % len(buttons)
-    delay_ms = random.randint(*delay_range)
+def start_button_cycle(pedal_id, buttons):
+    if pedal_id in pedal_jobs:
+        return
 
-    pedal_jobs[pedal_id] = cron.after(
-        f"{delay_ms}ms",
-        partial(button_list_cycle_step, pedal_id, buttons, delay_range, next_index)
+    index = 0
+    actions.user.controller_button_press(buttons[index])
+    pedal_indices[pedal_id] = (index + 1) % len(buttons)
+
+    delay = random.randint(DELAY_TIME_MIN, DELAY_TIME_MAX)
+    pedal_jobs[pedal_id] = cron.interval(
+        f"{delay}ms",
+        lambda: button_cycle(pedal_id, buttons),
     )
 
-def start_button_cycle(pedal_id, buttons, delay_range=(DELAY_TIME_MIN, DELAY_TIME_MAX)):
-    if pedal_jobs.get(pedal_id) is None:
-        button_list_cycle_step(pedal_id, buttons, delay_range, index=0)
-
 def stop_button_cycle(pedal_id):
-    job = pedal_jobs.get(pedal_id)
-    if job is not None:
+    job = pedal_jobs.pop(pedal_id, None)
+    if job:
         cron.cancel(job)
-        pedal_jobs[pedal_id] = None
+
+    pedal_indices.pop(pedal_id, None)
+
 
 # Game specific actions
 

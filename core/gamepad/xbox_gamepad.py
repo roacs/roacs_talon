@@ -1,35 +1,22 @@
-from talon import Module, app, cron
+from talon import Module, cron
 import threading
-import time
 import vgamepad as vg
-from inputs import get_gamepad
+
 from .xbox_buttons import Button, Trigger
+from .controller import XInputController, test_xinput
+
 
 mod = Module()
+
+
+# -----------------------------
+# Virtual controller
+# -----------------------------
 
 gamepad = vg.VX360Gamepad()
 gamepad.reset()
 gamepad.update()
 
-physical_state_lock = threading.Lock()
-external_state_lock = threading.Lock()
-
-physical_button_state = {
-    button.value: False for button in Button
-}
-
-physical_axes_state = {
-    "LX": 0,
-    "LY": 0,
-    "RX": 0,
-    "RY": 0,
-    "LT": 0,
-    "RT": 0,
-}
-
-external_state_counters = {
-    item.value: 0 for item in list(Button) + list(Trigger)
-}
 
 virtual_button_map = {
     Button.A.value: vg.XUSB_BUTTON.XUSB_GAMEPAD_A,
@@ -48,75 +35,73 @@ virtual_button_map = {
     Button.DPAD_RIGHT.value: vg.XUSB_BUTTON.XUSB_GAMEPAD_DPAD_RIGHT,
 }
 
-button_map = {
-    "BTN_SOUTH": Button.A.value,
-    "BTN_EAST": Button.B.value,
-    "BTN_WEST": Button.X.value,
-    "BTN_NORTH": Button.Y.value,
-    "BTN_TL": Button.LB.value,
-    "BTN_TR": Button.RB.value,
-    "BTN_SELECT": Button.START.value,  # These are mapped wrong for some reason
-    "BTN_START": Button.BACK.value,    # These are mapped wrong for some reason
-    "BTN_THUMBL": Button.L3.value,
-    "BTN_THUMBR": Button.R3.value,
+
+# -----------------------------
+# Physical controller
+# -----------------------------
+
+controller = XInputController(index=1)
+
+# -----------------------------
+# External Inputs to controller
+# -----------------------------
+
+external_state_counters = {
+    item.value: 0 for item in list(Button) + list(Trigger)
 }
 
-def normalize_axis(value):
-    return max(-32768, min(32767, value))
-
-def input_thread():
-    while True:
-        events = get_gamepad()
-
-        with physical_state_lock:
-            for event in events:
-                if event.code in button_map:
-                    physical_button_state[button_map[event.code]] = bool(event.state)
-                elif event.code == "ABS_HAT0X":
-                    physical_button_state[Button.DPAD_LEFT.value] = event.state < 0
-                    physical_button_state[Button.DPAD_RIGHT.value] = event.state > 0
-                elif event.code == "ABS_HAT0Y":
-                    physical_button_state[Button.DPAD_UP.value] = event.state < 0
-                    physical_button_state[Button.DPAD_DOWN.value] = event.state > 0
-                elif event.code == "ABS_X":
-                    physical_axes_state["LX"] = normalize_axis(event.state)
-                elif event.code == "ABS_Y":
-                    physical_axes_state["LY"] = normalize_axis(event.state)
-                elif event.code == "ABS_RX":
-                    physical_axes_state["RX"] = normalize_axis(event.state)
-                elif event.code == "ABS_RY":
-                    physical_axes_state["RY"] = normalize_axis(event.state)
-                elif event.code == "ABS_Z":
-                    physical_axes_state["LT"] = event.state
-                elif event.code == "ABS_RZ":
-                    physical_axes_state["RT"] = event.state
+external_state_lock = threading.Lock()
 
 
-def output_thread():
-    while True:
-        with physical_state_lock:
-            physical = physical_button_state.copy()
-            axes = physical_axes_state.copy()
+# -----------------------------
+# Poll XInput and update ViGEm
+# -----------------------------
 
-        with external_state_lock:
-            external = external_state_counters.copy()
+last_physical_state = None
+last_external_state = None
 
-        for name, button in virtual_button_map.items():
-            if physical[name] or external[name] > 0:
-                gamepad.press_button(button)
-            else:
-                gamepad.release_button(button)
+# TODO revisit this logic and see if there are any bugs
+def poll_controller():
 
-        gamepad.left_joystick(axes["LX"], axes["LY"])
-        gamepad.right_joystick(axes["RX"], axes["RY"])
+    global last_physical_state
+    global last_external_state
 
-        gamepad.left_trigger(255 if external[Trigger.LEFT.value] > 0 else axes["LT"])
-        gamepad.right_trigger(255 if external[Trigger.RIGHT.value] > 0 else axes["RT"])
+    physical = controller.read()
 
-        gamepad.update()
+    with external_state_lock:
+        external = external_state_counters.copy()
 
-        time.sleep(0.01)
+    if (physical == last_physical_state and external == last_external_state):
+        return
 
+    last_physical_state = physical
+    last_external_state = external
+
+    for name, button in virtual_button_map.items():
+        pressed = (physical[name] or external[name] > 0)
+
+        if pressed:
+            gamepad.press_button(button)
+        else:
+            gamepad.release_button(button)
+
+
+    gamepad.left_joystick(physical["LX"], physical["LY"])
+    gamepad.right_joystick(physical["RX"], physical["RY"])
+
+    gamepad.left_trigger(255 if external[Trigger.LEFT.value] > 0 else physical["LT"])
+    gamepad.right_trigger(255 if external[Trigger.RIGHT.value] > 0 else physical["RT"])
+
+    gamepad.update()
+
+
+cron_job = cron.interval("4ms", poll_controller)
+#cron_job = cron.interval("100ms", test_xinput)
+
+
+# -----------------------------
+# Talon actions
+# -----------------------------
 
 @mod.action_class
 class Actions:
@@ -152,13 +137,3 @@ def decrement_external_state(names):
         for name in names:
             external_state_counters[name] = max(0, external_state_counters[name] - 1)
 
-
-threading.Thread(
-    target=input_thread,
-    daemon=True
-).start()
-
-threading.Thread(
-    target=output_thread,
-    daemon=True
-).start()
