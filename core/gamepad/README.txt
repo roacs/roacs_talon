@@ -10,4 +10,4 @@ TODO description of how the gamepad works with external + physical
 
 TODO should voice buttons only be available with tag user.game?
 
-TODO look into adding some software calibration of the joysticks
+TODO look into adding ability to find joystick centers without hard-coding them in

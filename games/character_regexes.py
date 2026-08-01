@@ -26,6 +26,8 @@ REGEXES = {
     #    r'"incision|celebration|infamy|crystalising|entombing|polar|glaciated|frozen|freezing|frigid|icy"',
     "wand":
         r'"incision|penetrat|acclaim|renown|crystali|entomb|polar|vapour|electrocuting|discharg|flaring|tempered|razor"',
+    "dagger":
+        r'"incision|penetrat|devestating|overpower|unleashed|destruction|ferocity"',
 }
 
 
