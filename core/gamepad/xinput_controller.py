@@ -1,5 +1,7 @@
 import ctypes
 from ctypes import Structure, c_ubyte, c_ushort, c_short, c_ulong, POINTER
+from dataclasses import dataclass
+from .xinput_buttons import Button
 
 
 for dll in ("xinput1_4.dll", "xinput1_3.dll", "xinput9_1_0.dll"):
@@ -31,6 +33,16 @@ class XINPUT_STATE(Structure):
     ]
 
 
+@dataclass
+class ControllerState:
+    buttons: dict[Button, bool]
+    LX: int = 0
+    LY: int = 0
+    RX: int = 0
+    RY: int = 0
+    LT: int = 0
+    RT: int = 0
+
 XInputGetState = xinput.XInputGetState
 XInputGetState.argtypes = [
     ctypes.c_uint,
@@ -38,22 +50,21 @@ XInputGetState.argtypes = [
 ]
 XInputGetState.restype = ctypes.c_uint
 
-
-BUTTONS = {
-    "DPAD_UP": 0x0001,
-    "DPAD_DOWN": 0x0002,
-    "DPAD_LEFT": 0x0004,
-    "DPAD_RIGHT": 0x0008,
-    "START": 0x0010,
-    "BACK": 0x0020,
-    "L3": 0x0040,
-    "R3": 0x0080,
-    "LB": 0x0100,
-    "RB": 0x0200,
-    "A": 0x1000,
-    "B": 0x2000,
-    "X": 0x4000,
-    "Y": 0x8000,
+BUTTON_MASKS = {
+    Button.DPAD_UP: 0x0001,
+    Button.DPAD_DOWN: 0x0002,
+    Button.DPAD_LEFT: 0x0004,
+    Button.DPAD_RIGHT: 0x0008,
+    Button.START: 0x0010,
+    Button.BACK: 0x0020,
+    Button.L3: 0x0040,
+    Button.R3: 0x0080,
+    Button.LB: 0x0100,
+    Button.RB: 0x0200,
+    Button.A: 0x1000,
+    Button.B: 0x2000,
+    Button.X: 0x4000,
+    Button.Y: 0x8000,
 }
 
 class XInputController:
@@ -69,23 +80,21 @@ class XInputController:
 
         gp = self.state.Gamepad
 
-        return {
-            **{
-                name: bool(gp.wButtons & mask) for name, mask in BUTTONS.items()
+        return ControllerState(
+            buttons={
+                button: bool(gp.wButtons & mask) for button, mask in BUTTON_MASKS.items()
             },
-            "LX": gp.sThumbLX,
-            "LY": gp.sThumbLY,
-            "RX": gp.sThumbRX,
-            "RY": gp.sThumbRY,
-            "LT": gp.bLeftTrigger,
-            "RT": gp.bRightTrigger,
-        }
+            LX=gp.sThumbLX,
+            LY=gp.sThumbLY,
+            RX=gp.sThumbRX,
+            RY=gp.sThumbRY,
+            LT=gp.bLeftTrigger,
+            RT=gp.bRightTrigger,
+        )
 
 
 # This is for finding which controller is active.
-# TODO
-
-def test_xinput():
+def print_controller_state():
     for i in range(4):
         state = XINPUT_STATE()
         result = XInputGetState(i, ctypes.byref(state))

@@ -1,7 +1,6 @@
 For outputting to a virtual gamepad and reading from a physical controller
   Install packages in Talon's python
    - C:\Program Files\Talon\python.exe -m pip install vgamepad
-   - C:\Program Files\Talon\python.exe -m pip install inputs
 
   Install HidHide to hide the physical controller
    - Add Talon's python.exe, pythonw.exe, talon.exe, talon_console.exe to whitelist
@@ -10,3 +9,5 @@ For outputting to a virtual gamepad and reading from a physical controller
 TODO description of how the gamepad works with external + physical
 
 TODO should voice buttons only be available with tag user.game?
+
+TODO look into adding some software calibration of the joysticks

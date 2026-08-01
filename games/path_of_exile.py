@@ -1,5 +1,5 @@
 from talon import Module, Context, actions, cron
-from ..core.gamepad.xbox_buttons import Button, Trigger
+from ..core.gamepad.xinput_buttons import Button, Trigger
 from .character_regexes import get_regex
 import random
 

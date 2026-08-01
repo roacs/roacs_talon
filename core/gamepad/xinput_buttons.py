@@ -1,7 +1,5 @@
-from dataclasses import dataclass
 from enum import Enum
 
-@dataclass
 class Button(Enum):
     A = "A"
     B = "B"
@@ -18,7 +16,6 @@ class Button(Enum):
     DPAD_LEFT = "DPAD_LEFT"
     DPAD_RIGHT = "DPAD_RIGHT"
 
-@dataclass
 class Trigger(Enum):
     LEFT = "LT"
     RIGHT = "RT"
