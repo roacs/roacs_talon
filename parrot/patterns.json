@@ -1,12 +1,45 @@
 {
-    "click": {
-        "sounds": ["Palatal Click"],
+    "cluck": {
+        "sounds": ["Cluck"],
+        "threshold": {
+            ">power": 8,
+            ">probability": 0.99
+        },
+        "throttle": {
+            "cluck": 0.1
+        }
+    },
+
+    "hiss": {
+        "sounds": ["Hiss"],
+        "threshold": {
+            ">power": 6,
+            ">probability": 0.99
+        },
+        "throttle": {
+            "hiss": 0.1
+        }
+    },
+
+    "horse_click": {
+        "sounds": ["Horse_Click"],
         "threshold": {
             ">power": 6,
             ">probability": 0.80
         },
         "throttle": {
-            "click": 0.1
+            "horse_click": 0.1
+        }
+    },
+
+    "lateral_click": {
+        "sounds": ["Lateral_Click"],
+        "threshold": {
+            ">power": 6,
+            ">probability": 0.97
+        },
+        "throttle": {
+            "lateral_click": 0.1
         }
     },
 

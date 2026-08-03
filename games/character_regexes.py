@@ -11,7 +11,8 @@ class Category(str, Enum):
     MAP = "map"
 
 # SELECTED CHARACTER
-selected_character = Character.SLAYER_CYCLONE_329
+#selected_character = Character.SLAYER_CYCLONE_329
+selected_character = Character.LUMINARY_MERC_SUPPORT_329
 
 # non-character specific regexes
 
@@ -20,14 +21,16 @@ REGEXES = {
         r'"flaring|tempered|dictator|emperor|conquer|merciless|tyrannical|cruel|celebration"',
     "rog":
         r'"of all|suppress|chaos res|profane|spine bow|ivory bow|bone bow|thicket bow|grove bow|short bow|l arrow|% increased maximum life|bone ring|293|173|throwing"',
-    "sword":
+    "merc_sword":
         r'"incision|celebration|infamy|vapouri|electrocuting|discharging|shocking|arcing|sparking|crackling|snapping"',
     #"sword":
     #    r'"incision|celebration|infamy|crystalising|entombing|polar|glaciated|frozen|freezing|frigid|icy"',
-    "wand":
-        r'"incision|penetrat|acclaim|renown|crystali|entomb|polar|vapour|electrocuting|discharg|flaring|tempered|razor"',
-    "dagger":
+    "merc_wand":
+        r'"incision|penetrat|acclaim|renown|crystali|entomb|polar|vapour|electrocuting|discharg|flaring|xoph|pyrocl"',
+    "merc_dagger":
         r'"incision|penetrat|devestating|overpower|unleashed|destruction|ferocity"',
+    "merc_bow":
+        r'"devastating|overpowering|unleashed|f many|f splint|f incision|f penetrat|f acclaim|f renown"',
 }
 
 

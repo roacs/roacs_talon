@@ -7,15 +7,31 @@ class Actions:
 
     def noise_talon_pop():
         """Talon pop noise"""
-        print(f"pop with no context override in {ui.active_app().name}")
+        print(f"talon pop with no context override in {ui.active_app().name}")
     
     def noise_talon_hiss():
         """Talon hiss noise"""
-        print(f"hiss with no context override in {ui.active_app().name}")
+        print(f"talon hiss with no context override in {ui.active_app().name}")
+
+    def parrot_noise_cluck():
+        """Parrot cluck"""
+        print(f"parrot cluck with no context override in {ui.active_app().name}")
+
+    def parrot_noise_hiss():
+        """Parrot hiss"""
+        print(f"parrot hiss with no context override in {ui.active_app().name}")
+
+    def parrot_noise_horse_click():
+        """Parrot horse_click"""
+        print(f"parrot horse_click with no context override in {ui.active_app().name}")
+
+    def parrot_noise_lateral_click():
+        """Parrot lateral_click"""
+        print(f"parrot lateral_click with no context override in {ui.active_app().name}")
 
     def parrot_noise_whistle():
         """Parrot whistle"""
-        print(f"whistle with no context override in {ui.active_app().name}")
+        print(f"parrot whistle with no context override in {ui.active_app().name}")
         
 
 # Talon Noise mapping 

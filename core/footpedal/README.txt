@@ -7,8 +7,8 @@ keys to named actions for ease of use:
   F17 - olympus rs31h/31n foot switch right pedal
   F18 - olympus rs31h/31n foot switch top pedal
 
-There is an included olympus_rs31h.xml containing a template that can be loaded in 
-Olympus' FTSW tool to set the pedals to the right keys.  Can't be done through their
+There is an included olympus_rs31h.xml containing a template that can be loaded in the
+Olympus FTSW tool to set the pedals to the right keys.  The settings can't be done through their
 tool GUI.
 
 Footpedal actions do nothing by default and should be overriden in Context.

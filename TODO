@@ -1,4 +1,4 @@
-- Refactor the gamepad code so it uses less CPU
+- Can we make an auto-calibrate where the centers are chosen dynamically?
 
 - Add additional noises (parrot?)
   https://gist.github.com/ghouston/609b771716c846029c8504ac70fd1de8

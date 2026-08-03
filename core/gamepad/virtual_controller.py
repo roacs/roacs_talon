@@ -69,6 +69,9 @@ def poll_controller():
 
     physical = controller.read()
 
+    if physical is None:
+        return
+
     with external_state_lock:
         external = external_state_counters.copy()
 

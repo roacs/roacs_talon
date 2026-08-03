@@ -11,8 +11,8 @@ ctx.tags = ["user.game"]
 
 # Methods to press buttons in a list in sequence with a small delay between them
 
-DELAY_TIME_MIN = 100
-DELAY_TIME_MAX = 130
+DELAY_TIME_MIN = 80
+DELAY_TIME_MAX = 100
 
 pedal_jobs = {}
 pedal_indices = {}
@@ -72,7 +72,8 @@ class Actions:
     
     def noise_talon_hiss():
         """Talon hiss noise"""
-        pass
+        print("poe hiss")
+        #pass
 
     def parrot_noise_whistle():
         """Parrot whistle"""
