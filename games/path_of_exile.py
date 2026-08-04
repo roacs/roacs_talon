@@ -75,6 +75,22 @@ class Actions:
         print("poe hiss")
         #pass
 
+    def parrot_noise_cluck():
+        """Parrot cluck"""
+        skip()
+
+    def parrot_noise_hiss():
+        """Parrot hiss"""
+        skip()
+
+    def parrot_noise_horse_click():
+        """Parrot horse_click"""
+        actions.user.controller_button_press(Button.Y)
+
+    def parrot_noise_lateral_click():
+        """Parrot lateral_click"""
+        actions.user.controller_button_press(Button.Y)
+
     def parrot_noise_whistle():
         """Parrot whistle"""
         actions.user.controller_button_press(Button.A)

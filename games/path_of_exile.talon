@@ -15,3 +15,4 @@ vendor craft wand : user.insert_regex_name("merc_wand")
 vendor craft dagger : user.insert_regex_name("merc_dagger")
 vendor craft bow : user.insert_regex_name("merc_bow")
 
+vendor boat : user.insert_regex_name("boat")

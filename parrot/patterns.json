@@ -2,7 +2,7 @@
     "cluck": {
         "sounds": ["Cluck"],
         "threshold": {
-            ">power": 8,
+            ">power": 3,
             ">probability": 0.99
         },
         "throttle": {
@@ -24,8 +24,8 @@
     "horse_click": {
         "sounds": ["Horse_Click"],
         "threshold": {
-            ">power": 6,
-            ">probability": 0.80
+            ">power": 1,
+            ">probability": 0.90
         },
         "throttle": {
             "horse_click": 0.1
@@ -35,7 +35,7 @@
     "lateral_click": {
         "sounds": ["Lateral_Click"],
         "threshold": {
-            ">power": 6,
+            ">power": 1,
             ">probability": 0.97
         },
         "throttle": {
@@ -46,7 +46,7 @@
     "whistle": {
         "sounds": ["Whistle"],
         "threshold": {
-            ">power": 6,
+            ">power": 1,
             ">probability": 0.99
         },
         "throttle": {

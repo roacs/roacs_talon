@@ -31,6 +31,8 @@ REGEXES = {
         r'"incision|penetrat|devestating|overpower|unleashed|destruction|ferocity"',
     "merc_bow":
         r'"devastating|overpowering|unleashed|f many|f splint|f incision|f penetrat|f acclaim|f renown"',
+    "boat":
+        r'"cannot drop|poss|bottle|divine|arca|oper|star|pantheon|lantern|4000 w|strongbo|rare monsters in al|pillars"',
 }
 
 
@@ -45,7 +47,7 @@ CHARACTER_REGEXES = {
             r'"([rgb]-){2}[rgb]|-\w-|Runn|rint|me Sh"',
 
         Category.MAP:
-            r'"!ur$|kes$|t reg" "y: r"',
+            r'"!te of|ur$|kes$|\d+ e|t reg" "y: r"',
     },
 
     Character.SLAYER_CYCLONE_329: {

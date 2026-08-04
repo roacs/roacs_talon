@@ -20,3 +20,4 @@ to influence the state of the virtual controller.
 ### TODO
 * Add an auto-calibration to find joystick centers and also to select the physical controller
 * Should voice buttons only be available with tag user.game?
+* Use packetNumber to determine if physical state has not changed instead of comparing objects
