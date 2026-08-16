@@ -61,18 +61,26 @@ class Actions:
         """Send vendor clear"""
         actions.user.controller_button_press([Button.L3, Button.DPAD_RIGHT])
 
+    def special_menu_y():
+        """Controller special menu"""
+        actions.user.controller_button_press([Trigger.LEFT, Trigger.RIGHT, Button.Y])
+
+    def special_menu_a():
+        """Controller special menu"""
+        actions.user.controller_button_press([Trigger.LEFT, Trigger.RIGHT, Button.A])
+
 # Overriden Contextualized Actions
 
 @ctx.action_class("user")
 class Actions:
 
-    def noise_talon_pop():
+    def talon_noise_pop():
         """Talon pop noise"""
         actions.user.controller_button_press(Button.Y)
     
-    def noise_talon_hiss():
+    def talon_noise_hiss(active: bool):
         """Talon hiss noise"""
-        print("poe hiss")
+        print(f"poe hiss {active}")
         #pass
 
     def parrot_noise_cluck():

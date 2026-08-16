@@ -1,17 +1,25 @@
-from talon import Module, noise, actions, ui
+from talon import Module, actions, cron, noise, settings, ui
 
 mod = Module()
+hiss_cron = None
+
+mod.setting(
+    "hiss_scroll_debounce_time",
+    type=int,
+    default=100,
+    desc="How much time a hiss must last for to be considered a hiss rather than part of speech, in ms",
+)
 
 @mod.action_class
 class Actions:
 
-    def noise_talon_pop():
+    def talon_noise_pop():
         """Talon pop noise"""
         print(f"talon pop with no context override in {ui.active_app().name}")
     
-    def noise_talon_hiss():
+    def talon_noise_hiss(active: bool):
         """Talon hiss noise"""
-        print(f"talon hiss with no context override in {ui.active_app().name}")
+        print(f"talon hiss with no context override in {ui.active_app().name} active {active}")
 
     def parrot_noise_cluck():
         """Parrot cluck"""
@@ -34,15 +42,19 @@ class Actions:
         print(f"parrot whistle with no context override in {ui.active_app().name}")
         
 
-# Talon Noise mapping 
+def noise_trigger_hiss_debounce(active: bool):
+    """Since the hiss noise triggers while you're talking we need to debounce it"""
+    global hiss_cron
+    if active:
+        hiss_cron = cron.after(
+            str(f"{settings.get('user.hiss_scroll_debounce_time')}ms"),
+            lambda: actions.user.talon_noise_hiss(active),
+        )
+    else:
+        cron.cancel(hiss_cron)
+        actions.user.talon_noise_hiss(active)
 
-def on_pop(active):
-    actions.user.noise_talon_pop()
 
-def on_hiss(active):
-    actions.user.noise_talon_hiss()
-
-noise.register("pop", on_pop)
-noise.register("hiss", on_hiss)
-
+noise.register("pop", lambda _: actions.user.talon_noise_pop())
+noise.register("hiss", noise_trigger_hiss_debounce)
 

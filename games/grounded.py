@@ -14,11 +14,11 @@ ctx.tags = ["user.game"]
 @ctx.action_class("user")
 class Actions:
 
-    def noise_talon_pop():
+    def talon_noise_pop():
         """Talon pop noise"""
         actions.skip()
     
-    def noise_talon_hiss():
+    def talon_noise_hiss(active: bool):
         """Talon hiss noise"""
         actions.skip()
 

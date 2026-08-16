@@ -19,3 +19,9 @@ class Button(Enum):
 class Trigger(Enum):
     LEFT = "LT"
     RIGHT = "RT"
+
+class Axis(Enum):
+    LX = "LX"
+    LY = "LY"
+    RX = "RX"
+    RY = "RY"

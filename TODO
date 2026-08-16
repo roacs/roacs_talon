@@ -2,5 +2,21 @@
 
 - Add additional noises (parrot?)
   https://gist.github.com/ghouston/609b771716c846029c8504ac70fd1de8
+  hiss
+  shhh
+  palate click with new mic
 
 - Experiment with eye tracking
+  - set up initial desktop use just looking and clicking
+  - mode toggle? turn eye on/off
+  - make the sound to use to click configurable (not just pop)
+  - is there anything we want to disable while in a game?  commands?
+  - add in the ability to <function> + click (community)
+
+- Eyestick
+  - can we make it so it doesn't move all the time?
+  - enable/disable with press of a footswitch?
+  - configurable center and deadzone?
+
+- Add ability to launch applications and focus them (community has?)
+  - launch chrome, focus chrome, etc.

@@ -17,20 +17,26 @@ selected_character = Character.LUMINARY_MERC_SUPPORT_329
 # non-character specific regexes
 
 REGEXES = {
-    "physical":
-        r'"flaring|tempered|dictator|emperor|conquer|merciless|tyrannical|cruel|celebration"',
     "rog":
         r'"of all|suppress|chaos res|profane|spine bow|ivory bow|bone bow|thicket bow|grove bow|short bow|l arrow|% increased maximum life|bone ring|293|173|throwing"',
+    "physical":
+        r'"flaring|tempered|dictator|emperor|conquer|merciless|tyrannical|cruel|celebration"',
+    "mageblood":
+        r'"abecedar|dabbler|alchemist|armadil|pangolin|cheetah|incision|owl"',
     "merc_sword":
         r'"incision|celebration|infamy|vapouri|electrocuting|discharging|shocking|arcing|sparking|crackling|snapping"',
-    #"sword":
-    #    r'"incision|celebration|infamy|crystalising|entombing|polar|glaciated|frozen|freezing|frigid|icy"',
+    #"merc_wand":
+    #    r'"incision|penetrat|acclaim|renown|crystali|entomb|polar|vapour|electrocuting|discharg|flaring|xoph|pyrocl"',
     "merc_wand":
-        r'"incision|penetrat|acclaim|renown|crystali|entomb|polar|vapour|electrocuting|discharg|flaring|xoph|pyrocl"',
+        r'"runic"',
     "merc_dagger":
         r'"incision|penetrat|devestating|overpower|unleashed|destruction|ferocity"',
     "merc_bow":
         r'"devastating|overpowering|unleashed|f many|f splint|f incision|f penetrat|f acclaim|f renown"',
+    "merc_belt":
+        r'"fecund|devastating|overpowering|f tzte|f haast|f ephij"',
+    "ring":
+        r'"virile|gods|radiance|fleshbinding"',
     "boat":
         r'"cannot drop|poss|bottle|divine|arca|oper|star|pantheon|lantern|4000 w|strongbo|rare monsters in al|pillars"',
 }

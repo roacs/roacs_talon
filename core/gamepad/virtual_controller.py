@@ -2,7 +2,7 @@ from talon import Module, cron
 import threading
 import vgamepad as vg
 
-from .xinput_buttons import Button, Trigger
+from .xinput_buttons import Button, Trigger, Axis
 from .xinput_controller import XInputController, ControllerState, print_controller_state
 
 
@@ -44,10 +44,13 @@ virtual_button_map = {
 
 # -----------------------------
 # Inputs External from the physical controller
+# Counters are used for buttons/triggers and values for sticks
 # -----------------------------
 
-external_state_counters = {
-    item: 0 for item in list(Button) + list(Trigger)
+external_state = {
+    **{item: 0 for item in list(Button) + list(Trigger)},
+    Axis.LX: None,
+    Axis.LY: None
 }
 
 external_state_lock = threading.Lock()
@@ -73,7 +76,7 @@ def poll_controller():
         return
 
     with external_state_lock:
-        external = external_state_counters.copy()
+        external = external_state.copy()
 
     if (physical == last_physical_state and external == last_external_state):
         return
@@ -90,7 +93,9 @@ def poll_controller():
             gamepad.release_button(virtual_button)
 
 
-    gamepad.left_joystick(physical.LX, physical.LY)
+    lx = physical.LX if external[Axis.LX] is None else external[Axis.LX]
+    ly = physical.LY if external[Axis.LY] is None else external[Axis.LY]
+    gamepad.left_joystick(lx, ly)
     gamepad.right_joystick(physical.RX, physical.RY)
 
     gamepad.left_trigger(255 if external[Trigger.LEFT] > 0 else physical.LT)
@@ -127,14 +132,29 @@ class Actions:
             increment_external_state(buttons)
             cron.after("30ms", lambda: decrement_external_state(buttons))
 
+    def controller_left_stick(x: int, y: int):
+        """Move the left analog stick. Physical input disabled until controller_left_stick_clear called."""
+        x = max(-32768, min(32767, x))
+        y = max(-32768, min(32767, y))
+
+        with external_state_lock:
+            external_state[Axis.LX] = x
+            external_state[Axis.LY] = y
+
+    def controller_left_stick_clear():
+        """Return left stick control to the physical controller."""
+        with external_state_lock:
+            external_state[Axis.LX] = None
+            external_state[Axis.LY] = None
+
 
 def increment_external_state(buttons):
     with external_state_lock:
         for button in buttons:
-            external_state_counters[button] += 1
+            external_state[button] += 1
 
 def decrement_external_state(buttons):
     with external_state_lock:
         for button in buttons:
-            external_state_counters[button] = max(0, external_state_counters[button] - 1)
+            external_state[button] = max(0, external_state[button] - 1)
 
