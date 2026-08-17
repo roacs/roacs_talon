@@ -6,7 +6,7 @@ key(f13):           user.footpedal_ikkegol_dual_left_down()
 key(f13:up):        user.footpedal_ikkegol_dual_left_up()
 
 # Ikkegol Dual Right Pedal
-key(f14):           user.footpedal_ikkegol_dual_right_up()
+key(f14):           user.footpedal_ikkegol_dual_right_down()
 key(f14:up):        user.footpedal_ikkegol_dual_right_up()
 
 # Olympus RS31 Left Pedal
@@ -24,3 +24,7 @@ key(f17:up):        user.footpedal_olympus_right_up()
 # Olympus RS31 Top Pedal
 key(f18):           user.footpedal_olympus_top_down()
 key(f18:up):        user.footpedal_olympus_top_up()
+
+# Ikkegol Single Foot Switch
+key(f19):           user.footpedal_ikkegol_single_down()
+key(f19:up):        user.footpedal_ikkegol_single_up()

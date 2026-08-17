@@ -61,6 +61,14 @@ class Actions:
         """pedal up"""
         actions.user.controller_button_up(Button.X)
 
+    def footpedal_ikkegol_single_down():
+        """pedal down"""
+        pass
+
+    def footpedal_ikkegol_single_up():
+        """pedal up"""
+        pass
+
     def footpedal_olympus_left_down():
         """pedal down"""
         actions.skip()

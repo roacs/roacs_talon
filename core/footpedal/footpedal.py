@@ -21,6 +21,14 @@ class Actions:
         """pedal up"""
         print(f"footpedal called with no context override in {ui.active_app().name}")
 
+    def footpedal_ikkegol_single_down():
+        """pedal down"""
+        print(f"footpedal called with no context override in {ui.active_app().name}")
+
+    def footpedal_ikkegol_single_up():
+        """pedal up"""
+        print(f"footpedal called with no context override in {ui.active_app().name}")
+
     def footpedal_olympus_left_down():
         """pedal down"""
         print(f"footpedal called with no context override in {ui.active_app().name}")

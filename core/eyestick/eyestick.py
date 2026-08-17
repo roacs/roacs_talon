@@ -1,7 +1,6 @@
 from talon import Module, actions, cron, ui
 from talon.canvas import Canvas, MouseEvent
-from talon.screen import Screen
-from talon.skia.canvas import Canvas as SkiaCanvas
+from skia import Canvas as SkiaCanvas
 import math
 
 mod = Module()
@@ -13,7 +12,7 @@ def on_draw(c: SkiaCanvas):
     c.paint.style = c.paint.Style.STROKE
     c.paint.stroke_width = 2
 
-    screen: Screen = ui.main_screen()
+    screen = ui.main_screen()
     x = screen.rect.center.x
     y = screen.rect.center.y
     c.draw_circle(x, y, 10)

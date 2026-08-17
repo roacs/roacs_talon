@@ -122,6 +122,14 @@ class Actions:
         """pedal up"""
         pass
 
+    def footpedal_ikkegol_single_down():
+        """pedal down"""
+        pass
+
+    def footpedal_ikkegol_single_up():
+        """pedal up"""
+        pass
+
     def footpedal_olympus_left_down():
         """pedal down"""
         start_button_cycle("olympus_left", [Button.X, Button.DPAD_LEFT])
