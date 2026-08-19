@@ -1,4 +1,4 @@
-- Can we make an auto-calibrate where the centers are chosen dynamically?
+- Can we make a gamepad auto-calibrate where the centers are chosen dynamically?
 
 - Add additional noises (parrot?)
   https://gist.github.com/ghouston/609b771716c846029c8504ac70fd1de8
@@ -17,6 +17,3 @@
   - can we make it so it doesn't move all the time?
   - enable/disable with press of a footswitch?
   - configurable center and deadzone?
-
-- Add ability to launch applications and focus them (community has?)
-  - launch chrome, focus chrome, etc.
