@@ -1,7 +1,4 @@
+tag: user.voice_buttons
 -
 
-# Dpad Buttons
-#pad up : user.press_dpad_up()
-#pad right : user.press_dpad_right()
-#pad down : user.press_dpad_down()
-#pad left : user.press_dpad_left()
+{user.voice_button_phrase}: user.press_voice_button(voice_button_phrase)

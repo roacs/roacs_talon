@@ -1,4 +1,8 @@
-- Can we make a gamepad auto-calibrate where the centers are chosen dynamically?
+- Gamepad
+  - Can we make a gamepad auto-calibrate where the centers are chosen dynamically?
+  - Add ability to turn the virtual controller on/off and HidHide on/off the real controller
+  - Add ability to select physical controllers that feed into the virtual controller
+    so that other joysticks can be used (foot/hand)
 
 - Add additional noises (parrot?)
   https://gist.github.com/ghouston/609b771716c846029c8504ac70fd1de8

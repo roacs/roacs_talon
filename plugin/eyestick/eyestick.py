@@ -38,8 +38,8 @@ def hide():
 
 @mod.action_class
 class Actions:
-    def eyestick_debug_start():
-        """ debug start """
+    def eyestick_start():
+        """ eyestick start """
         global position_job
 
         actions.tracking.control_toggle(True)
@@ -48,10 +48,10 @@ class Actions:
             show()
             
         if position_job is None:
-            position_job = cron.interval("100ms", update_eye_stick)
+            position_job = cron.interval("20ms", update_eye_stick)
 
-    def eyestick_debug_stop():
-        """ debug stop """
+    def eyestick_stop():
+        """ eyestick stop """
         global position_job
 
         actions.tracking.control_toggle(False)

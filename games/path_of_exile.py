@@ -8,6 +8,7 @@ ctx.matches = r"""
 app: PathOfExileSteam.exe
 """
 ctx.tags = ["user.game"]
+ctx.tags = ["user.voice_buttons"]
 
 # Methods to press buttons in a list in sequence with a small delay between them
 
@@ -124,11 +125,11 @@ class Actions:
 
     def footpedal_ikkegol_single_down():
         """pedal down"""
-        pass
+        actions.user.eyestick_start()
 
     def footpedal_ikkegol_single_up():
         """pedal up"""
-        pass
+        actions.user.eyestick_stop()
 
     def footpedal_olympus_left_down():
         """pedal down"""

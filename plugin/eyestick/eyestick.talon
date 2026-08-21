@@ -1,3 +1,3 @@
 -
-debug start:      user.eyestick_debug_start()
-debug stop:       user.eyestick_debug_stop()
+eyestick start:      user.eyestick_start()
+eyestick stop:       user.eyestick_stop()
