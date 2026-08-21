@@ -3,19 +3,16 @@ import threading
 import vgamepad as vg
 
 from .xinput_buttons import Button, Trigger, Axis
-from .xinput_controller import XInputController, ControllerState, print_controller_state
+from .xinput_controller import XInputController, ControllerState
 
 
 mod = Module()
 
 # -----------------------------
-# Physical controller
+# Physical controller(s)
 # -----------------------------
 
-controller = XInputController(index=1)
-
-# uncomment this and view the log while pressing things on controller to find index
-#cron_job = cron.interval("100ms", print_controller_state)
+controller = XInputController(indices=[1,3])
 
 # -----------------------------
 # Virtual controller
