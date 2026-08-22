@@ -3,7 +3,7 @@ import threading
 import vgamepad as vg
 
 from .xinput_buttons import Button, Trigger, Axis
-from .xinput_controller import XInputController, ControllerState
+from .xinput_controller import XInputController, ControllerState, StandardGamepadTranslator, DpadToStickTranslator
 
 
 mod = Module()
@@ -12,7 +12,24 @@ mod = Module()
 # Physical controller(s)
 # -----------------------------
 
-controller = XInputController(indices=[1,3])
+# TODO need to have a way of calibrating the stick and saving that calibration somewhere
+#      having to change them here manually is no bueno
+standard_xbox_controller = StandardGamepadTranslator(
+    centers={
+        "LX": -1351,
+        "LY": 0,
+        "RX": -2240,
+        "RY": -512,
+    },
+    apply_calibration=True,
+)
+
+fight_stick_dpad_as_analog_stick = DpadToStickTranslator()
+
+controller = XInputController({
+    1: standard_xbox_controller,
+    2: fight_stick_dpad_as_analog_stick
+})
 
 # -----------------------------
 # Virtual controller

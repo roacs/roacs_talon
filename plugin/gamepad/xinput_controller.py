@@ -1,6 +1,7 @@
 import ctypes
 from ctypes import Structure, c_ubyte, c_ushort, c_short, c_ulong, POINTER
 from dataclasses import dataclass
+from typing import Protocol
 from .xinput_buttons import Button
 
 
@@ -70,13 +71,19 @@ XInputGetCapabilities.argtypes = [
 XInputGetCapabilities.restype = ctypes.c_uint
 
 # ---------------------------------------------
-# Maps and Constants
+# XInput Constants
 # ---------------------------------------------
 
 ERROR_SUCCESS = 0
 
 MIN_AXIS = -32768
 MAX_AXIS = 32767
+
+XINPUT_FLAG_GAMEPAD = 0x00000001
+
+# ---------------------------------------------
+# XInput Maps
+# ---------------------------------------------
 
 AXIS_FIELDS = {
     "LX": "sThumbLX",
@@ -102,8 +109,6 @@ BUTTON_MASKS = {
     Button.Y: 0x8000,
 }
 
-XINPUT_FLAG_GAMEPAD = 0x00000001
-XINPUT_DEVTYPE_GAMEPAD = 0x01
 
 SUBTYPE_NAMES = {
     0x00: "Unknown",
@@ -139,46 +144,39 @@ class AxisCalibration:
     positive_scale: float
 
 # ---------------------------------------------
-# XInput Controller
+# Translator Interface
 # ---------------------------------------------
 
-class XInputController:
+class GamepadTranslator(Protocol):
 
-    def __init__(self, indices=(0,), centers=None, apply_calibration=False):
-        self.indices = list(indices)
-        self.apply_calibration = apply_calibration
-        self.states = {index: XINPUT_STATE() for index in self.indices}
+    def translate(self, gamepad: XINPUT_GAMEPAD) -> ControllerState:
+        ...
 
+# ---------------------------------------------
+# Standard Gamepad Translator
+# ---------------------------------------------
+
+class StandardGamepadTranslator:
+
+    def __init__(self, centers=None, apply_calibration=False):
         if centers is None:
             centers = {
-                index: {"LX": 0, "LY": 0, "RX": 0, "RY": 0}
-                for index in self.indices
+                "LX": 0,
+                "LY": 0,
+                "RX": 0,
+                "RY": 0,
             }
 
-        # TODO need to have a way of calibrating the stick and saving that calibration
-        # somewhere
-        ## Joystick center positions.
-        ## Modify with care; use print_xinput_controllers() to find them.
-        #centers = {
-        #    "LX": -1351,
-        #    "LY": 0,
-        #    "RX": -2240,
-        #    "RY": -512,
-        #}
+        self.apply_calibration = apply_calibration
 
-        self.calibrations = {}
-
-        for index in self.indices:
-            index_centers = centers.get(index, {})
-
-            self.calibrations[index] = {
-                axis: AxisCalibration(
-                    center=index_centers.get(axis, 0),
-                    negative_scale=MIN_AXIS / (MIN_AXIS - index_centers.get(axis, 0)),
-                    positive_scale=MAX_AXIS / (MAX_AXIS - index_centers.get(axis, 0)),
-                )
-                for axis in AXIS_FIELDS
-            }
+        self.calibrations = {
+            axis: AxisCalibration(
+                center=centers.get(axis, 0),
+                negative_scale=MIN_AXIS / (MIN_AXIS - centers.get(axis, 0)),
+                positive_scale=MAX_AXIS / (MAX_AXIS - centers.get(axis, 0)),
+            )
+            for axis in AXIS_FIELDS
+        }
 
     def calibrate(self, value, calibration):
         if self.apply_calibration:
@@ -191,13 +189,86 @@ class XInputController:
 
         return max(MIN_AXIS, min(MAX_AXIS, value))
 
+    def translate(self, gamepad):
+        buttons = {
+            button: bool(gamepad.wButtons & mask) for button, mask in BUTTON_MASKS.items()
+        }
+
+        axes = {
+            axis: self.calibrate(getattr(gamepad, field), self.calibrations[axis])
+            for axis, field in AXIS_FIELDS.items()
+        }
+
+        return ControllerState(
+            buttons=buttons,
+            **axes,
+            LT=gamepad.bLeftTrigger,
+            RT=gamepad.bRightTrigger,
+        )
+
+
+# ---------------------------------------------
+# Dpad As Analog Stick Translator (because fight stick joystick is a dpad)
+# ---------------------------------------------
+
+class DpadToStickTranslator(StandardGamepadTranslator):
+
+    def translate(self, gamepad):
+        state = super().translate(gamepad)
+
+        if gamepad.wButtons & BUTTON_MASKS[Button.DPAD_LEFT]:
+            state.LX = MIN_AXIS
+        elif gamepad.wButtons & BUTTON_MASKS[Button.DPAD_RIGHT]:
+            state.LX = MAX_AXIS
+
+        if gamepad.wButtons & BUTTON_MASKS[Button.DPAD_UP]:
+            state.LY = MAX_AXIS
+        elif gamepad.wButtons & BUTTON_MASKS[Button.DPAD_DOWN]:
+            state.LY = MIN_AXIS
+
+        state.buttons[Button.DPAD_UP] = False
+        state.buttons[Button.DPAD_DOWN] = False
+        state.buttons[Button.DPAD_LEFT] = False
+        state.buttons[Button.DPAD_RIGHT] = False
+
+        return state
+
+# ---------------------------------------------
+# XInput Controller
+# ---------------------------------------------
+
+class XInputController:
+
+    def __init__(self, translators):
+        self.translators = dict(translators)
+        self.indices = list(self.translators)
+        self.states = {index: XINPUT_STATE() for index in self.indices}
+
     @staticmethod
     def merge_axis(values):
         """Return the value with the greatest magnitude."""
         return max(values, key=abs, default=0)
 
+    @classmethod
+    def merge_states(cls, states):
+        if not states:
+            return None
+
+        buttons = {
+            button: any(state.buttons[button] for state in states) for button in BUTTON_MASKS
+        }
+
+        axes = {
+            axis: cls.merge_axis([getattr(state, axis) for state in states]) for axis in AXIS_FIELDS
+        }
+
+        LT = max(state.LT for state in states)
+        RT = max(state.RT for state in states)
+
+        return ControllerState(buttons=buttons, **axes, LT=LT, RT=RT)
+
     def read(self):
-        gamepads = []
+        translated_states = []
 
         for index in self.indices:
             state = self.states[index]
@@ -206,32 +277,12 @@ class XInputController:
             if result != ERROR_SUCCESS:
                 continue
 
-            gp = state.Gamepad
+            gamepad = state.Gamepad
+            translator = self.translators[index]
 
-            axes = {
-                axis: self.calibrate(getattr(gp, field), self.calibrations[index][axis])
-                for axis, field in AXIS_FIELDS.items()
-            }
+            translated_states.append(translator.translate(gamepad))
 
-            gamepads.append({"gamepad": gp, "axes": axes})
-
-        if not gamepads:
-            return None
-
-        buttons = {
-            button: any(item["gamepad"].wButtons & mask for item in gamepads)
-            for button, mask in BUTTON_MASKS.items()
-        }
-
-        axes = {
-            axis: self.merge_axis([item["axes"][axis] for item in gamepads])
-            for axis in AXIS_FIELDS
-        }
-
-        LT = max(item["gamepad"].bLeftTrigger for item in gamepads)
-        RT = max(item["gamepad"].bRightTrigger for item in gamepads)
-
-        return ControllerState(buttons=buttons, **axes, LT=LT, RT=RT)
+        return self.merge_states(translated_states)
 
 
 # ---------------------------------------------
