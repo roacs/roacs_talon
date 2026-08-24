@@ -29,7 +29,14 @@ state changes.
 Using voice phrases to push buttons on the virtual controller.
 
 ### TODO
-* Need to add the ability to assign an index to a physical controller automatically (perhaps
-  with some kind of "press button on controller to use dialog")
+* Need the ability to add physical devices to be used by the virtual controller automatically
+  Perhaps with a GUI where you press buttons on the device to help select it
 * Add an auto-calibration to find joystick centers
 * Use packetNumber to determine if physical state has not changed instead of comparing objects
+* big goal: 
+  - have xinput just be one of many physical inputs that can be fed into the virtual controller
+  - allow other types (hid maybe?) and allow a virtual controller to be set up with any number
+    of physical devices.  Will have to abstract a poll that returns a ControllerState and loop
+    the physical devices.  XInputDevice, HIDDevice, etc.
+  - Keep support and maybe streamline the "translator" abstraction that goes from physical
+    inputs into virtual (i.e. dpad to joystick).
