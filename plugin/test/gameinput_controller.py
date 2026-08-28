@@ -57,7 +57,7 @@ class GameInputController:
     # Enumeration
     # ------------------------------------------------------------------
 
-    def enumerate_devices(self, kind=GI.GameInputKind.Gamepad):
+    def enumerate_devices(self, kind=GI.GameInputKind.Gamepad | GI.GameInputKind.RawDeviceReport):
         """Enumerate connected devices matching `kind`. Returns a list of
         GamepadDevice. Replaces any previously enumerated devices (the
         old ones are released)."""
@@ -117,7 +117,7 @@ class GameInputController:
     # Reading current state
     # ------------------------------------------------------------------
 
-    def get_current_reading(self, device, kind=GI.GameInputKind.Gamepad):
+    def get_current_reading(self, device=None, kind=GI.GameInputKind.Gamepad | GI.GameInputKind.RawDeviceReport):
         """Return a raw IGameInputReading* (c_void_p) for `device`, or
         None if unavailable. Caller must GI.IUnknown.release() it when done."""
 
@@ -139,6 +139,8 @@ class GameInputController:
 
         if reading is None:
             return None
+
+        self._print_reading(reading)
 
         try:
             state = GI.GameInputGamepadState()
@@ -174,6 +176,67 @@ class GameInputController:
             }
         finally:
             GI.IUnknown.release(reading)
+
+    def _get_reading_device_info(self, reading):
+        device = c_void_p()
+        GI.IGameInputReading.getDevice(reading, byref(device))
+
+        if not device.value:
+            return None
+
+        try:
+            return self._get_device_info(device)
+        finally:
+            GI.release(device)
+
+    def _print_reading(self, reading):
+        info = self._get_reading_device_info(reading)
+        input_kind = GI.IGameInputReading.getInputKind(reading)
+        kind = GI.GameInputKind(input_kind)
+
+        print(f"Input kind: {kind}  VID=0x{info.vendorId:04X}  PID=0x{info.productId:04x}")
+
+        if kind & GI.GameInputKind.Gamepad:
+            self._print_gamepad_reading(reading)
+        else:
+            print(f"No printer implemented for {kind}")
+
+    def _print_gamepad_reading(self, reading):
+        """Print the high-level gamepad state"""
+
+        state = GI.GameInputGamepadState()
+        success = GI.IGameInputReading.getGamepadState(reading, byref(state))
+
+        if not success:
+            return None
+
+        if state is not None:
+            buttons = GI.GameInputGamepadButtons(state.buttons)
+
+            print("Gamepad state:")
+            print(f"  Buttons:             {buttons}")
+            print(f"  A:                   {bool(buttons & GI.GameInputGamepadButtons.A)}")
+            print(f"  B:                   {bool(buttons & GI.GameInputGamepadButtons.B)}")
+            print(f"  X:                   {bool(buttons & GI.GameInputGamepadButtons.X)}")
+            print(f"  Y:                   {bool(buttons & GI.GameInputGamepadButtons.Y)}")
+            print(f"  Menu:                {bool(buttons & GI.GameInputGamepadButtons.Menu)}")
+            print(f"  View:                {bool(buttons & GI.GameInputGamepadButtons.View)}")
+            print(f"  DPadUp:              {bool(buttons & GI.GameInputGamepadButtons.DPadUp)}")
+            print(f"  DPadDown:            {bool(buttons & GI.GameInputGamepadButtons.DPadDown)}")
+            print(f"  DPadLeft:            {bool(buttons & GI.GameInputGamepadButtons.DPadLeft)}")
+            print(f"  DPadRight:           {bool(buttons & GI.GameInputGamepadButtons.DPadRight)}")
+            print(f"  LeftShoulder:        {bool(buttons & GI.GameInputGamepadButtons.LeftShoulder)}")
+            print(f"  RightShoulder:       {bool(buttons & GI.GameInputGamepadButtons.RightShoulder)}")
+            print(f"  LeftThumbstick:      {bool(buttons & GI.GameInputGamepadButtons.LeftThumbstick)}")
+            print(f"  RightThumbstick:     {bool(buttons & GI.GameInputGamepadButtons.RightThumbstick)}")
+            print(f"  LeftTrigger:         {state.leftTrigger:+.4f}")
+            print(f"  RightTrigger:        {state.rightTrigger:+.4f}")
+            print(f"  LeftThumbstickX:     {state.leftThumbstickX:+.4f}")
+            print(f"  LeftThumbstickY:     {state.leftThumbstickY:+.4f}")
+            print(f"  RightThumbstickX:    {state.rightThumbstickX:+.4f}")
+            print(f"  RightThumbstickY:    {state.rightThumbstickY:+.4f}")
+            return
+
 
     # ------------------------------------------------------------------
     # Lookup / diagnostics

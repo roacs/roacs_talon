@@ -8,8 +8,11 @@ _job = None
 _device = None
 _controller = get_controller()
 
-TARGET_VENDOR_ID = 0x1532
-TARGET_PRODUCT_ID = 0x0A14
+
+TARGET_VENDOR_ID = None
+TARGET_PRODUCT_ID = None
+#TARGET_VENDOR_ID = 0x1532
+#TARGET_PRODUCT_ID = 0x0A14
 
 def poll_controller():
     """Called on every cron.interval tick while polling is active."""
@@ -17,15 +20,13 @@ def poll_controller():
     global _device
     global _controller
 
-    if _device is None:
-        _device = _controller.get_device(TARGET_VENDOR_ID, TARGET_PRODUCT_ID)
+    if TARGET_VENDOR_ID is not None and TARGET_PRODUCT_ID is not None:
         if _device is None:
-            print(
-                f"gameinput: target device VID=0x{TARGET_VENDOR_ID:04X} "
-                f"PID=0x{TARGET_PRODUCT_ID:04X} not found"
-            )
-            return
-        print(f"gameinput: polling {_device}")
+            _device = _controller.get_device(TARGET_VENDOR_ID, TARGET_PRODUCT_ID)
+            if _device is None:
+                print(f"gameinput: target device VID=0x{TARGET_VENDOR_ID:04X} PID=0x{TARGET_PRODUCT_ID:04X} not found")
+                return
+            print(f"gameinput: polling {_device}")
 
     state = _controller.read_gamepad_state(_device)
 
@@ -40,12 +41,12 @@ def poll_controller():
         "LeftThumbstick", "RightThumbstick",
     ) if state[name]]
 
-    print(
-        f"gameinput: buttons=[{', '.join(pressed)}] "
-        f"LT={state['LeftTrigger']:.2f} RT={state['RightTrigger']:.2f} "
-        f"LX={state['LeftThumbstickX']:+.2f} LY={state['LeftThumbstickY']:+.2f} "
-        f"RX={state['RightThumbstickX']:+.2f} RY={state['RightThumbstickY']:+.2f}"
-    )
+    #print(
+    #    f"gameinput: buttons=[{', '.join(pressed)}] "
+    #    f"LT={state['LeftTrigger']:.2f} RT={state['RightTrigger']:.2f} "
+    #    f"LX={state['LeftThumbstickX']:+.2f} LY={state['LeftThumbstickY']:+.2f} "
+    #    f"RX={state['RightThumbstickX']:+.2f} RY={state['RightThumbstickY']:+.2f}"
+    #)
 
 @mod.action_class
 class Actions:
