@@ -6,7 +6,7 @@ mod = Module()
 
 _job = None
 _device = None
-_controller = get_controller()
+_controller = get_controller(ignored_devices=[(0x045E, 0x028E)])
 
 
 TARGET_VENDOR_ID = None

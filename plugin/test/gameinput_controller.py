@@ -31,6 +31,14 @@ class GamepadDevice:
         return self.info.productId
 
     @property
+    def family(self):
+        return GI.GameInputDeviceFamily(self.info.deviceFamily)
+
+    @property
+    def kind(self):
+        return GI.GameInputKind(self.info.supportedInput)
+
+    @property
     def display_name(self):
         return self.info.displayName.decode("utf-8", errors="replace") if self.info.displayName else None
 
@@ -39,16 +47,17 @@ class GamepadDevice:
 
     def __repr__(self):
         name = self.display_name or "<unnamed>"
-        return f"GamepadDevice(VID=0x{self.vendor_id:04X}, PID=0x{self.product_id:04X}, name={name!r})"
+        return f"GamepadDevice(VID=0x{self.vendor_id:04X}, PID=0x{self.product_id:04X}, name={name!r}, family={self.family.name}, kind={self.kind.value:0XX} )"
 
 
 class GameInputController:
     """Owns one IGameInput instance: enumerates gamepads and polls state."""
 
-    def __init__(self, dll_path=GI.GAMEINPUT_REDIST_PATH, allow_background_input=True):
+    def __init__(self, dll_path=GI.GAMEINPUT_REDIST_PATH, allow_background_input=True, ignored_devices=None):
         self._dll = GI.load_dll(dll_path)
         self._gameinput = GI.create_gameinput(self._dll)
         self._devices = []
+        self._ignored_devices = set(ignored_devices or [])
 
         if allow_background_input:
             GI.IGameInput.setFocusPolicy(self._gameinput, GI.GameInputFocusPolicy.EnableBackgroundInput)
@@ -140,9 +149,14 @@ class GameInputController:
         if reading is None:
             return None
 
-        self._print_reading(reading)
-
         try:
+            info = self._get_reading_device_info(reading)
+            if info is not None:
+                if (info.vendorId, info.productId) in self._ignored_devices:
+                    return None
+
+            self._print_reading(reading)
+
             state = GI.GameInputGamepadState()
             success = GI.IGameInputReading.getGamepadState(reading, byref(state))
 
@@ -187,7 +201,7 @@ class GameInputController:
         try:
             return self._get_device_info(device)
         finally:
-            GI.release(device)
+            GI.IUnknown.release(device)
 
     def _print_reading(self, reading):
         info = self._get_reading_device_info(reading)
@@ -195,6 +209,7 @@ class GameInputController:
         kind = GI.GameInputKind(input_kind)
 
         print(f"Input kind: {kind}  VID=0x{info.vendorId:04X}  PID=0x{info.productId:04x}")
+        print(f"family={GI.GameInputDeviceFamily(info.deviceFamily).name} pnpPath={info.pnpPath}")
 
         if kind & GI.GameInputKind.Gamepad:
             self._print_gamepad_reading(reading)
@@ -281,8 +296,8 @@ class GameInputController:
 _controller = None
 
 
-def get_controller():
+def get_controller(ignored_devices=None):
     global _controller
     if _controller is None:
-        _controller = GameInputController()
+        _controller = GameInputController(ignored_devices=ignored_devices)
     return _controller

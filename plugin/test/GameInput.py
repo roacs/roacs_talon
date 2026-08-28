@@ -1116,23 +1116,6 @@ def get_method(interface, index, restype, argtypes):
 
     return ctypes.WINFUNCTYPE(restype, c_void_p, *argtypes)(address)
 
-
-def addref(interface):
-    """AddRef a COM interface. Returns the new refcount."""
-
-    if not interface:
-        return 0
-    return get_method(interface, IUnknownIdx.ADD_REF, c_uint32, [])(interface)
-
-
-def release(interface):
-    """Release a COM interface. Returns the new refcount."""
-
-    if not interface:
-        return 0
-    return get_method(interface, IUnknownIdx.RELEASE, c_uint32, [])(interface)
-
-
 def check_hresult(hr, operation):
     """Raise OSError if an HRESULT indicates failure."""
 
@@ -1156,11 +1139,15 @@ class IUnknown:
 
     @staticmethod
     def addRef(interface):
-        return addref(interface)
+        if not interface:
+            return 0
+        return get_method(interface, IUnknownIdx.ADD_REF, c_uint32, [])(interface)
 
     @staticmethod
     def release(interface):
-        return release(interface)
+        if not interface:
+            return 0
+        return get_method(interface, IUnknownIdx.RELEASE, c_uint32, [])(interface)
 
 
 # ============================================================================
