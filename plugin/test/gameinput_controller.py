@@ -8,7 +8,6 @@ does the actual COM calls to enumerate devices and read their state.
 
 import ctypes
 from ctypes import byref, c_void_p, c_uint32, c_uint64, c_long, c_bool
-import time
 
 from . import GameInput as GI
 
@@ -36,7 +35,7 @@ class GamepadDevice:
         return self.info.displayName.decode("utf-8", errors="replace") if self.info.displayName else None
 
     def release(self):
-        GI.release(self.device)
+        GI.IUnknown.release(self.device)
 
     def __repr__(self):
         name = self.display_name or "<unnamed>"
@@ -52,29 +51,13 @@ class GameInputController:
         self._devices = []
 
         if allow_background_input:
-            # By default GameInput only delivers live input state to the
-            # foreground application (so a background process can't
-            # silently read input meant for whatever has focus).
-            # Enumeration and device info still work without this, but
-            # every GetXState() call will report success with all-zero
-            # data unless we opt in here. Talon is a background process,
-            # so this is required for real state to ever show up.
-            self.set_focus_policy(GI.GameInputFocusPolicy.EnableBackgroundInput)
-
-    def set_focus_policy(self, policy):
-        method = GI.get_method(self._gameinput, GI.IGameInputIdx.SET_FOCUS_POLICY, None, [c_uint32])
-        method(self._gameinput, int(policy))
+            GI.IGameInput.setFocusPolicy(self._gameinput, GI.GameInputFocusPolicy.EnableBackgroundInput)
 
     # ------------------------------------------------------------------
     # Enumeration
-    #
-    # Devices handed to the callback are only valid for the duration of
-    # the callback unless AddRef'd (Microsoft's own samples, e.g.
-    # DirectXTK's GamePad.cpp, do this explicitly). We AddRef here and
-    # keep the reference for the lifetime of the GamepadDevice object.
     # ------------------------------------------------------------------
 
-    def enumerate_devices(self, kind=GI.GameInputKind.Gamepad, timeout=0.5, poll_interval=0.01):
+    def enumerate_devices(self, kind=GI.GameInputKind.Gamepad):
         """Enumerate connected devices matching `kind`. Returns a list of
         GamepadDevice. Replaces any previously enumerated devices (the
         old ones are released)."""
@@ -91,24 +74,17 @@ class GameInputController:
                 return
             seen.add(device_ptr)
             handle = c_void_p(device_ptr)
-            GI.addref(handle)
+            GI.IUnknown.addRef(handle)
             raw_devices.append(handle)
 
         callback_ref = GI.GameInputDeviceCallback(callback)
         token = c_uint64()
 
-        method = GI.get_method(
-            self._gameinput,
-            GI.IGameInputIdx.REGISTER_DEVICE_CALLBACK,
-            c_long,
-            [c_void_p, c_uint32, c_uint32, c_uint32, c_void_p, GI.GameInputDeviceCallback, ctypes.POINTER(c_uint64)],
-        )
-
-        hr = method(
+        hr = GI.IGameInput.registerDeviceCallback(
             self._gameinput,
             None,
-            int(kind),
-            int(GI.GameInputDeviceStatus.AnyStatus),
+            kind,
+            GI.GameInputDeviceStatus.AnyStatus,
             GI.GameInputEnumerationKind.BlockingEnumeration,
             None,
             callback_ref,
@@ -116,41 +92,21 @@ class GameInputController:
         )
         GI.check_hresult(hr, "RegisterDeviceCallback")
 
-        # Settle-poll: blocking enumeration has been observed on some
-        # GameInput versions to not fully synchronize before returning.
-        # Stop early once the device count is stable for a few polls.
-        deadline = time.monotonic() + timeout
-        stable_polls = 0
-        last_count = -1
-
-        while time.monotonic() < deadline:
-            if len(raw_devices) == last_count:
-                stable_polls += 1
-                if stable_polls >= 3 and len(raw_devices) > 0:
-                    break
-            else:
-                stable_polls = 0
-            last_count = len(raw_devices)
-            time.sleep(poll_interval)
-
         if token.value:
-            unregister = GI.get_method(self._gameinput, GI.IGameInputIdx.UNREGISTER_CALLBACK, c_bool, [c_uint64])
-            unregister(self._gameinput, token.value)
+            GI.IGameInput.unregisterCallback(self._gameinput, token.value)
 
         for handle in raw_devices:
             info = self._get_device_info(handle)
             if info is not None:
                 self._devices.append(GamepadDevice(handle.value, info))
             else:
-                GI.release(handle)
+                GI.IUnknown.release(handle)
 
         return list(self._devices)
 
     def _get_device_info(self, device):
-        method = GI.get_method(device, GI.IGameInputDeviceIdx.GET_DEVICE_INFO, c_long, [ctypes.POINTER(c_void_p)])
-
         info_ptr = c_void_p()
-        hr = method(device, byref(info_ptr))
+        hr = GI.IGameInputDevice.getDeviceInfo(device, byref(info_ptr))
 
         if hr != 0 or not info_ptr.value:
             return None
@@ -163,18 +119,12 @@ class GameInputController:
 
     def get_current_reading(self, device, kind=GI.GameInputKind.Gamepad):
         """Return a raw IGameInputReading* (c_void_p) for `device`, or
-        None if unavailable. Caller must GI.release() it when done."""
-
-        method = GI.get_method(
-            self._gameinput,
-            GI.IGameInputIdx.GET_CURRENT_READING,
-            c_long,
-            [c_uint32, c_void_p, ctypes.POINTER(c_void_p)],
-        )
+        None if unavailable. Caller must GI.IUnknown.release() it when done."""
 
         reading = c_void_p()
         device_ptr = device.device if isinstance(device, GamepadDevice) else device
-        hr = method(self._gameinput, int(kind), device_ptr, byref(reading))
+
+        hr = GI.IGameInput.getCurrentReading(self._gameinput, kind, device_ptr, byref(reading))
 
         if hr != 0 or not reading.value:
             return None
@@ -191,15 +141,8 @@ class GameInputController:
             return None
 
         try:
-            method = GI.get_method(
-                reading,
-                GI.IGameInputReadingIdx.GET_GAMEPAD_STATE,
-                c_bool,
-                [ctypes.POINTER(GI.GameInputGamepadState)],
-            )
-
             state = GI.GameInputGamepadState()
-            success = method(reading, byref(state))
+            success = GI.IGameInputReading.getGamepadState(reading, byref(state))
 
             if not success:
                 return None
@@ -230,7 +173,7 @@ class GameInputController:
                 "RightThumbstickY": state.rightThumbstickY,
             }
         finally:
-            GI.release(reading)
+            GI.IUnknown.release(reading)
 
     # ------------------------------------------------------------------
     # Lookup / diagnostics
@@ -258,7 +201,7 @@ class GameInputController:
         self._devices = []
 
         if self._gameinput is not None:
-            GI.release(self._gameinput)
+            GI.IUnknown.release(self._gameinput)
             self._gameinput = None
 
     def __del__(self):

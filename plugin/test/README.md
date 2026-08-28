@@ -6,3 +6,7 @@
 VID / PID
 0x0738 0x4718 Mad Catz Street Fighter IV FightStick SE
 0x1532 0x0A14 Razer Wolverine Ultimate 
+0x057e 0x2006 Nintendo Switch Left Joy-Con
+0x057e 0x2007 Nintendo Switch Right Joy-Con
+
+

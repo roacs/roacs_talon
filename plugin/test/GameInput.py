@@ -874,7 +874,9 @@ class GameInputRumbleParams(Structure):
     ]
 
 
-# --- Force feedback params (used by CreateForceFeedbackEffect) -----------
+# ============================================================================
+# Force feedback params
+# ============================================================================
 
 class GameInputForceFeedbackEnvelope(Structure):
     _fields_ = [
@@ -961,7 +963,9 @@ class GameInputForceFeedbackParams(Structure):
     ]
 
 
-# --- Mapping structs (used by IGameInputMapper) ---------------------------
+# ============================================================================
+# Mapping structs
+# ============================================================================
 
 class GameInputAxisMapping(Structure):
     _fields_ = [
@@ -1135,6 +1139,844 @@ def check_hresult(hr, operation):
     if hr < 0:
         raise OSError(f"{operation} failed: HRESULT=0x{hr & 0xFFFFFFFF:08X}")
 
+# ============================================================================
+# IUnknown
+# ============================================================================
+
+class IUnknown:
+    @staticmethod
+    def queryInterface(interface, iid, result):
+        method = get_method(
+            interface,
+            IUnknownIdx.QUERY_INTERFACE,
+            c_long,
+            [POINTER(GUID), POINTER(c_void_p)],
+        )
+        return method(interface, byref(iid), result)
+
+    @staticmethod
+    def addRef(interface):
+        return addref(interface)
+
+    @staticmethod
+    def release(interface):
+        return release(interface)
+
+
+# ============================================================================
+# IGameInput
+# ============================================================================
+
+class IGameInput:
+    @staticmethod
+    def getCurrentTimestamp(interface):
+        method = get_method(
+            interface,
+            IGameInputIdx.GET_CURRENT_TIMESTAMP,
+            c_uint64,
+            [],
+        )
+        return method(interface)
+
+    @staticmethod
+    def getCurrentReading(interface, inputKind, device, reading):
+        method = get_method(
+            interface,
+            IGameInputIdx.GET_CURRENT_READING,
+            c_long,
+            [c_uint32, c_void_p, POINTER(c_void_p)],
+        )
+        return method(
+            interface,
+            int(inputKind),
+            device,
+            reading,
+        )
+
+    @staticmethod
+    def getNextReading(interface, referenceReading, inputKind, device, reading):
+        method = get_method(
+            interface,
+            IGameInputIdx.GET_NEXT_READING,
+            c_long,
+            [c_void_p, c_uint32, c_void_p, POINTER(c_void_p)],
+        )
+        return method(
+            interface,
+            referenceReading,
+            int(inputKind),
+            device,
+            reading,
+        )
+
+    @staticmethod
+    def getPreviousReading(interface, referenceReading, inputKind, device, reading):
+        method = get_method(
+            interface,
+            IGameInputIdx.GET_PREVIOUS_READING,
+            c_long,
+            [c_void_p, c_uint32, c_void_p, POINTER(c_void_p)],
+        )
+        return method(
+            interface,
+            referenceReading,
+            int(inputKind),
+            device,
+            reading,
+        )
+
+    @staticmethod
+    def registerReadingCallback(
+        interface,
+        device,
+        inputKind,
+        context,
+        callback,
+        token,
+    ):
+        method = get_method(
+            interface,
+            IGameInputIdx.REGISTER_READING_CALLBACK,
+            c_long,
+            [
+                c_void_p,
+                c_uint32,
+                c_void_p,
+                GameInputReadingCallback,
+                POINTER(c_uint64),
+            ],
+        )
+        return method(
+            interface,
+            device,
+            int(inputKind),
+            context,
+            callback,
+            token,
+        )
+
+    @staticmethod
+    def registerDeviceCallback(
+        interface,
+        device,
+        inputKind,
+        statusFilter,
+        enumerationKind,
+        context,
+        callback,
+        token,
+    ):
+        method = get_method(
+            interface,
+            IGameInputIdx.REGISTER_DEVICE_CALLBACK,
+            c_long,
+            [
+                c_void_p,
+                c_uint32,
+                c_uint32,
+                c_uint32,
+                c_void_p,
+                GameInputDeviceCallback,
+                POINTER(c_uint64),
+            ],
+        )
+        return method(
+            interface,
+            device,
+            int(inputKind),
+            int(statusFilter),
+            int(enumerationKind),
+            context,
+            callback,
+            token,
+        )
+
+    @staticmethod
+    def registerSystemButtonCallback(
+        interface,
+        device,
+        buttonFilter,
+        context,
+        callback,
+        token,
+    ):
+        method = get_method(
+            interface,
+            IGameInputIdx.REGISTER_SYSTEM_BUTTON_CALLBACK,
+            c_long,
+            [
+                c_void_p,
+                c_uint32,
+                c_void_p,
+                GameInputSystemButtonCallback,
+                POINTER(c_uint64),
+            ],
+        )
+        return method(
+            interface,
+            device,
+            int(buttonFilter),
+            context,
+            callback,
+            token,
+        )
+
+    @staticmethod
+    def registerKeyboardLayoutCallback(
+        interface,
+        device,
+        context,
+        callback,
+        token,
+    ):
+        method = get_method(
+            interface,
+            IGameInputIdx.REGISTER_KEYBOARD_LAYOUT_CALLBACK,
+            c_long,
+            [
+                c_void_p,
+                c_void_p,
+                GameInputKeyboardLayoutCallback,
+                POINTER(c_uint64),
+            ],
+        )
+        return method(
+            interface,
+            device,
+            context,
+            callback,
+            token,
+        )
+
+    @staticmethod
+    def stopCallback(interface, token):
+        method = get_method(
+            interface,
+            IGameInputIdx.STOP_CALLBACK,
+            None,
+            [c_uint64],
+        )
+        return method(interface, token)
+
+    @staticmethod
+    def unregisterCallback(interface, token):
+        method = get_method(
+            interface,
+            IGameInputIdx.UNREGISTER_CALLBACK,
+            c_bool,
+            [c_uint64],
+        )
+        return method(interface, token)
+
+    @staticmethod
+    def createDispatcher(interface, dispatcher):
+        method = get_method(
+            interface,
+            IGameInputIdx.CREATE_DISPATCHER,
+            c_long,
+            [POINTER(c_void_p)],
+        )
+        return method(interface, dispatcher)
+
+    @staticmethod
+    def findDeviceFromId(interface, deviceId, device):
+        method = get_method(
+            interface,
+            IGameInputIdx.FIND_DEVICE_FROM_ID,
+            c_long,
+            [POINTER(APP_LOCAL_DEVICE_ID), POINTER(c_void_p)],
+        )
+        return method(interface, deviceId, device)
+
+    @staticmethod
+    def findDeviceFromPlatformString(interface, platformString, device):
+        method = get_method(
+            interface,
+            IGameInputIdx.FIND_DEVICE_FROM_PLATFORM_STRING,
+            c_long,
+            [c_char_p, POINTER(c_void_p)],
+        )
+        return method(interface, platformString, device)
+
+    @staticmethod
+    def setFocusPolicy(interface, policy):
+        method = get_method(
+            interface,
+            IGameInputIdx.SET_FOCUS_POLICY,
+            None,
+            [c_uint32],
+        )
+        return method(interface, int(policy))
+
+    @staticmethod
+    def createAggregateDevice(interface, inputKind, device):
+        method = get_method(
+            interface,
+            IGameInputIdx.CREATE_AGGREGATE_DEVICE,
+            c_long,
+            [c_uint32, POINTER(c_void_p)],
+        )
+        return method(
+            interface,
+            int(inputKind),
+            device,
+        )
+
+    @staticmethod
+    def disableAggregateDevice(interface, device):
+        method = get_method(
+            interface,
+            IGameInputIdx.DISABLE_AGGREGATE_DEVICE,
+            c_long,
+            [c_void_p],
+        )
+        return method(interface, device)
+
+
+# ============================================================================
+# IGameInputReading
+# ============================================================================
+
+class IGameInputReading:
+    @staticmethod
+    def getInputKind(interface):
+        method = get_method(
+            interface,
+            IGameInputReadingIdx.GET_INPUT_KIND,
+            c_uint32,
+            [],
+        )
+        return method(interface)
+
+    @staticmethod
+    def getTimestamp(interface):
+        method = get_method(
+            interface,
+            IGameInputReadingIdx.GET_TIMESTAMP,
+            c_uint64,
+            [],
+        )
+        return method(interface)
+
+    @staticmethod
+    def getDevice(interface, device):
+        method = get_method(
+            interface,
+            IGameInputReadingIdx.GET_DEVICE,
+            None,
+            [POINTER(c_void_p)],
+        )
+        return method(interface, device)
+
+    @staticmethod
+    def getControllerAxisCount(interface):
+        method = get_method(
+            interface,
+            IGameInputReadingIdx.GET_CONTROLLER_AXIS_COUNT,
+            c_uint32,
+            [],
+        )
+        return method(interface)
+
+    @staticmethod
+    def getControllerAxisState(interface, index, state):
+        method = get_method(
+            interface,
+            IGameInputReadingIdx.GET_CONTROLLER_AXIS_STATE,
+            c_bool,
+            [c_uint32, POINTER(c_float)],
+        )
+        return method(interface, index, state)
+
+    @staticmethod
+    def getControllerButtonCount(interface):
+        method = get_method(
+            interface,
+            IGameInputReadingIdx.GET_CONTROLLER_BUTTON_COUNT,
+            c_uint32,
+            [],
+        )
+        return method(interface)
+
+    @staticmethod
+    def getControllerButtonState(interface, index, state):
+        method = get_method(
+            interface,
+            IGameInputReadingIdx.GET_CONTROLLER_BUTTON_STATE,
+            c_bool,
+            [c_uint32, POINTER(c_bool)],
+        )
+        return method(interface, index, state)
+
+    @staticmethod
+    def getControllerSwitchCount(interface):
+        method = get_method(
+            interface,
+            IGameInputReadingIdx.GET_CONTROLLER_SWITCH_COUNT,
+            c_uint32,
+            [],
+        )
+        return method(interface)
+
+    @staticmethod
+    def getControllerSwitchState(interface, index, state):
+        method = get_method(
+            interface,
+            IGameInputReadingIdx.GET_CONTROLLER_SWITCH_STATE,
+            c_bool,
+            [c_uint32, POINTER(c_int32)],
+        )
+        return method(interface, index, state)
+
+    @staticmethod
+    def getKeyCount(interface):
+        method = get_method(
+            interface,
+            IGameInputReadingIdx.GET_KEY_COUNT,
+            c_uint32,
+            [],
+        )
+        return method(interface)
+
+    @staticmethod
+    def getKeyState(interface, state, count):
+        method = get_method(
+            interface,
+            IGameInputReadingIdx.GET_KEY_STATE,
+            c_uint32,
+            [POINTER(GameInputKeyState), c_uint32],
+        )
+        return method(interface, state, count)
+
+    @staticmethod
+    def getMouseState(interface, state):
+        method = get_method(
+            interface,
+            IGameInputReadingIdx.GET_MOUSE_STATE,
+            c_bool,
+            [POINTER(GameInputMouseState)],
+        )
+        return method(interface, state)
+
+    @staticmethod
+    def getSensorsState(interface, state):
+        method = get_method(
+            interface,
+            IGameInputReadingIdx.GET_SENSORS_STATE,
+            c_bool,
+            [POINTER(GameInputSensorsState)],
+        )
+        return method(interface, state)
+
+    @staticmethod
+    def getArcadeStickState(interface, state):
+        method = get_method(
+            interface,
+            IGameInputReadingIdx.GET_ARCADE_STICK_STATE,
+            c_bool,
+            [POINTER(GameInputArcadeStickState)],
+        )
+        return method(interface, state)
+
+    @staticmethod
+    def getFlightStickState(interface, state):
+        method = get_method(
+            interface,
+            IGameInputReadingIdx.GET_FLIGHT_STICK_STATE,
+            c_bool,
+            [POINTER(GameInputFlightStickState)],
+        )
+        return method(interface, state)
+
+    @staticmethod
+    def getGamepadState(interface, state):
+        method = get_method(
+            interface,
+            IGameInputReadingIdx.GET_GAMEPAD_STATE,
+            c_bool,
+            [POINTER(GameInputGamepadState)],
+        )
+        return method(interface, state)
+
+    @staticmethod
+    def getRacingWheelState(interface, state):
+        method = get_method(
+            interface,
+            IGameInputReadingIdx.GET_RACING_WHEEL_STATE,
+            c_bool,
+            [POINTER(GameInputRacingWheelState)],
+        )
+        return method(interface, state)
+
+    @staticmethod
+    def getRawReport(interface, reportKind, reportId, data, dataSize):
+        method = get_method(
+            interface,
+            IGameInputReadingIdx.GET_RAW_REPORT,
+            c_long,
+            [c_int32, c_uint32, c_void_p, c_uint32],
+        )
+        return method(
+            interface,
+            int(reportKind),
+            reportId,
+            data,
+            dataSize,
+        )
+
+
+# ============================================================================
+# IGameInputDevice
+# ============================================================================
+
+class IGameInputDevice:
+    @staticmethod
+    def getDeviceInfo(interface, info):
+        method = get_method(
+            interface,
+            IGameInputDeviceIdx.GET_DEVICE_INFO,
+            c_long,
+            [POINTER(c_void_p)],
+        )
+        return method(interface, info)
+
+    @staticmethod
+    def getHapticInfo(interface, info):
+        method = get_method(
+            interface,
+            IGameInputDeviceIdx.GET_HAPTIC_INFO,
+            c_bool,
+            [POINTER(GameInputHapticInfo)],
+        )
+        return method(interface, info)
+
+    @staticmethod
+    def getDeviceStatus(interface):
+        method = get_method(
+            interface,
+            IGameInputDeviceIdx.GET_DEVICE_STATUS,
+            c_uint32,
+            [],
+        )
+        return method(interface)
+
+    @staticmethod
+    def createForceFeedbackEffect(interface, motorIndex, params, effect):
+        method = get_method(
+            interface,
+            IGameInputDeviceIdx.CREATE_FORCE_FEEDBACK_EFFECT,
+            c_long,
+            [c_uint32, POINTER(GameInputForceFeedbackParams), POINTER(c_void_p)],
+        )
+        return method(
+            interface,
+            motorIndex,
+            params,
+            effect,
+        )
+
+    @staticmethod
+    def isForceFeedbackMotorPoweredOn(interface, motorIndex):
+        method = get_method(
+            interface,
+            IGameInputDeviceIdx.IS_FORCE_FEEDBACK_MOTOR_POWERED_ON,
+            c_bool,
+            [c_uint32],
+        )
+        return method(interface, motorIndex)
+
+    @staticmethod
+    def setForceFeedbackMotorGain(interface, motorIndex, gain):
+        method = get_method(
+            interface,
+            IGameInputDeviceIdx.SET_FORCE_FEEDBACK_MOTOR_GAIN,
+            c_long,
+            [c_uint32, c_float],
+        )
+        return method(interface, motorIndex, gain)
+
+    @staticmethod
+    def setRumbleState(interface, params):
+        method = get_method(
+            interface,
+            IGameInputDeviceIdx.SET_RUMBLE_STATE,
+            c_long,
+            [POINTER(GameInputRumbleParams)],
+        )
+        return method(interface, params)
+
+    @staticmethod
+    def directInputEscape(interface, request, response):
+        method = get_method(
+            interface,
+            IGameInputDeviceIdx.DIRECT_INPUT_ESCAPE,
+            c_long,
+            [c_void_p, c_void_p],
+        )
+        return method(interface, request, response)
+
+    @staticmethod
+    def createInputMapper(interface, mapper):
+        method = get_method(
+            interface,
+            IGameInputDeviceIdx.CREATE_INPUT_MAPPER,
+            c_long,
+            [POINTER(c_void_p)],
+        )
+        return method(interface, mapper)
+
+    @staticmethod
+    def getExtraAxisCount(interface):
+        method = get_method(
+            interface,
+            IGameInputDeviceIdx.GET_EXTRA_AXIS_COUNT,
+            c_uint32,
+            [],
+        )
+        return method(interface)
+
+    @staticmethod
+    def getExtraButtonCount(interface):
+        method = get_method(
+            interface,
+            IGameInputDeviceIdx.GET_EXTRA_BUTTON_COUNT,
+            c_uint32,
+            [],
+        )
+        return method(interface)
+
+    @staticmethod
+    def getExtraAxisIndexes(interface, indexes):
+        method = get_method(
+            interface,
+            IGameInputDeviceIdx.GET_EXTRA_AXIS_INDEXES,
+            c_uint32,
+            [POINTER(c_uint32)],
+        )
+        return method(interface, indexes)
+
+    @staticmethod
+    def getExtraButtonIndexes(interface, indexes):
+        method = get_method(
+            interface,
+            IGameInputDeviceIdx.GET_EXTRA_BUTTON_INDEXES,
+            c_uint32,
+            [POINTER(c_uint32)],
+        )
+        return method(interface, indexes)
+
+    @staticmethod
+    def createRawDeviceReport(interface, reportKind, reportId, report):
+        method = get_method(
+            interface,
+            IGameInputDeviceIdx.CREATE_RAW_DEVICE_REPORT,
+            c_long,
+            [c_int32, c_uint32, POINTER(c_void_p)],
+        )
+        return method(
+            interface,
+            int(reportKind),
+            reportId,
+            report,
+        )
+
+    @staticmethod
+    def sendRawDeviceOutput(interface, report):
+        method = get_method(
+            interface,
+            IGameInputDeviceIdx.SEND_RAW_DEVICE_OUTPUT,
+            c_long,
+            [c_void_p],
+        )
+        return method(interface, report)
+
+
+# ============================================================================
+# IGameInputDispatcher
+# ============================================================================
+
+class IGameInputDispatcher:
+    @staticmethod
+    def dispatch(interface):
+        method = get_method(
+            interface,
+            IGameInputDispatcherIdx.DISPATCH,
+            None,
+            [],
+        )
+        return method(interface)
+
+    @staticmethod
+    def openWaitHandle(interface):
+        method = get_method(
+            interface,
+            IGameInputDispatcherIdx.OPEN_WAIT_HANDLE,
+            c_long,
+            [POINTER(c_void_p)],
+        )
+        return method(interface)
+
+
+# ============================================================================
+# IGameInputForceFeedbackEffect
+# ============================================================================
+
+class IGameInputForceFeedbackEffect:
+    @staticmethod
+    def getDevice(interface, device):
+        method = get_method(
+            interface,
+            IGameInputForceFeedbackEffectIdx.GET_DEVICE,
+            None,
+            [POINTER(c_void_p)],
+        )
+        return method(interface, device)
+
+    @staticmethod
+    def getMotorIndex(interface):
+        method = get_method(
+            interface,
+            IGameInputForceFeedbackEffectIdx.GET_MOTOR_INDEX,
+            c_uint32,
+            [],
+        )
+        return method(interface)
+
+    @staticmethod
+    def getGain(interface):
+        method = get_method(
+            interface,
+            IGameInputForceFeedbackEffectIdx.GET_GAIN,
+            c_float,
+            [],
+        )
+        return method(interface)
+
+    @staticmethod
+    def setGain(interface, gain):
+        method = get_method(
+            interface,
+            IGameInputForceFeedbackEffectIdx.SET_GAIN,
+            None,
+            [c_float],
+        )
+        return method(interface, gain)
+
+    @staticmethod
+    def getParams(interface, params):
+        method = get_method(
+            interface,
+            IGameInputForceFeedbackEffectIdx.GET_PARAMS,
+            c_long,
+            [POINTER(GameInputForceFeedbackParams)],
+        )
+        return method(interface, params)
+
+    @staticmethod
+    def setParams(interface, params):
+        method = get_method(
+            interface,
+            IGameInputForceFeedbackEffectIdx.SET_PARAMS,
+            c_long,
+            [POINTER(GameInputForceFeedbackParams)],
+        )
+        return method(interface, params)
+
+    @staticmethod
+    def getState(interface):
+        method = get_method(
+            interface,
+            IGameInputForceFeedbackEffectIdx.GET_STATE,
+            c_int32,
+            [],
+        )
+        return method(interface)
+
+    @staticmethod
+    def setState(interface, state):
+        method = get_method(
+            interface,
+            IGameInputForceFeedbackEffectIdx.SET_STATE,
+            c_long,
+            [c_int32],
+        )
+        return method(interface, int(state))
+
+
+# ============================================================================
+# IGameInputMapper
+# ============================================================================
+
+class IGameInputMapper:
+    @staticmethod
+    def getArcadeStickButtonMappingInfo(interface, index, mapping):
+        method = get_method(
+            interface,
+            IGameInputMapperIdx.GET_ARCADE_STICK_BUTTON_MAPPING_INFO,
+            c_bool,
+            [c_uint32, POINTER(GameInputButtonMapping)],
+        )
+        return method(interface, index, mapping)
+
+    @staticmethod
+    def getFlightStickAxisMappingInfo(interface, index, mapping):
+        method = get_method(
+            interface,
+            IGameInputMapperIdx.GET_FLIGHT_STICK_AXIS_MAPPING_INFO,
+            c_bool,
+            [c_uint32, POINTER(GameInputAxisMapping)],
+        )
+        return method(interface, index, mapping)
+
+    @staticmethod
+    def getFlightStickButtonMappingInfo(interface, index, mapping):
+        method = get_method(
+            interface,
+            IGameInputMapperIdx.GET_FLIGHT_STICK_BUTTON_MAPPING_INFO,
+            c_bool,
+            [c_uint32, POINTER(GameInputButtonMapping)],
+        )
+        return method(interface, index, mapping)
+
+    @staticmethod
+    def getGamepadAxisMappingInfo(interface, index, mapping):
+        method = get_method(
+            interface,
+            IGameInputMapperIdx.GET_GAMEPAD_AXIS_MAPPING_INFO,
+            c_bool,
+            [c_uint32, POINTER(GameInputAxisMapping)],
+        )
+        return method(interface, index, mapping)
+
+    @staticmethod
+    def getGamepadButtonMappingInfo(interface, index, mapping):
+        method = get_method(
+            interface,
+            IGameInputMapperIdx.GET_GAMEPAD_BUTTON_MAPPING_INFO,
+            c_bool,
+            [c_uint32, POINTER(GameInputButtonMapping)],
+        )
+        return method(interface, index, mapping)
+
+    @staticmethod
+    def getRacingWheelAxisMappingInfo(interface, index, mapping):
+        method = get_method(
+            interface,
+            IGameInputMapperIdx.GET_RACING_WHEEL_AXIS_MAPPING_INFO,
+            c_bool,
+            [c_uint32, POINTER(GameInputAxisMapping)],
+        )
+        return method(interface, index, mapping)
+
+    @staticmethod
+    def getRacingWheelButtonMappingInfo(interface, index, mapping):
+        method = get_method(
+            interface,
+            IGameInputMapperIdx.GET_RACING_WHEEL_BUTTON_MAPPING_INFO,
+            c_bool,
+            [c_uint32, POINTER(GameInputButtonMapping)],
+        )
+        return method(interface, index, mapping)
 
 # ============================================================================
 # DLL loading / interface creation
