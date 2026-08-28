@@ -6,23 +6,28 @@ mod = Module()
 
 _job = None
 _device = None
+_controller = get_controller()
+
+TARGET_VENDOR_ID = 0x1532
+TARGET_PRODUCT_ID = 0x0A14
 
 def poll_controller():
     """Called on every cron.interval tick while polling is active."""
 
     global _device
-
-    controller = get_controller()
+    global _controller
 
     if _device is None:
-        devices = controller.enumerate_devices()
-        if not devices:
-            print("gameinput: no gamepads found")
+        _device = _controller.get_device(TARGET_VENDOR_ID, TARGET_PRODUCT_ID)
+        if _device is None:
+            print(
+                f"gameinput: target device VID=0x{TARGET_VENDOR_ID:04X} "
+                f"PID=0x{TARGET_PRODUCT_ID:04X} not found"
+            )
             return
-        _device = devices[0]
         print(f"gameinput: polling {_device}")
 
-    state = controller.read_gamepad_state(_device)
+    state = _controller.read_gamepad_state(_device)
 
     if state is None:
         print("gameinput: no reading available")
@@ -73,4 +78,5 @@ class Actions:
 
     def gameinput_devices():
         """Print connected GameInput devices."""
-        get_controller().print_devices()
+        global _controller
+        _controller.print_devices()

@@ -27,7 +27,7 @@ standard_xbox_controller = StandardGamepadTranslator(
 fight_stick_dpad_as_analog_stick = DpadToStickTranslator()
 
 controller = XInputController({
-    1: standard_xbox_controller,
+    0: standard_xbox_controller,
     2: fight_stick_dpad_as_analog_stick
 })
 
