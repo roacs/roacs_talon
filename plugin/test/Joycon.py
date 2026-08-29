@@ -1,20 +1,6 @@
-"""
-joycon.py
-
-A minimal Joy-Con (Nintendo Switch) HID driver, poll-based rather than
-thread-based. Protocol details (output report framing, subcommands, SPI
-calibration reads, input report bit layout) follow the same underlying
-Joy-Con protocol documented by dekuNukem's Nintendo_Switch_Reverse_
-Engineering project; this is an original implementation structured
-around explicit polling instead of a background reader thread.
-
-Requires the `hid` package (hidapi bindings): pip install hidapi
-"""
-
 import time
-from typing import Optional
-
 import hid
+from .gamepad_types import Button, Trigger, Stick, GamepadState
 
 
 # ============================================================================
@@ -31,9 +17,7 @@ _STANDARD_REPORT_SIZE = 49
 _SUBCOMMAND_REPLY_REPORT_ID = 0x21
 
 # Rumble is required framing on every output report even when unused;
-# this is the neutral/no-rumble payload.
 _NEUTRAL_RUMBLE_DATA = b"\x00\x01\x40\x40\x00\x01\x40\x40"
-
 
 def find_joycon_ids(product_id=None):
     """Return a list of (vendor_id, product_id, serial) for connected
@@ -55,10 +39,8 @@ def _int16_le(low_byte, high_byte):
 
 
 class JoyCon:
-    """A connected Joy-Con, polled on demand rather than via a
-    background thread. Call poll() before reading any get_*() method to
-    refresh cached state; get_*() methods just read whatever was cached
-    by the most recent poll()."""
+    """A connected Joy-Con, Call poll() before reading any get_*() method to
+    refresh cached state"""
 
     def __init__(self, vendor_id, product_id, serial=None):
         if vendor_id != NINTENDO_VENDOR_ID:
@@ -326,27 +308,22 @@ class JoyCon:
         )
 
     def get_status(self):
-        return {
+        status = {
             "battery": {
                 "charging": self.get_battery_charging(),
                 "level": self.get_battery_level(),
             },
-            "buttons": {
-                "y": self.get_button_y(),
-                "x": self.get_button_x(),
-                "b": self.get_button_b(),
-                "a": self.get_button_a(),
-                "right_sr": self.get_button_right_sr(),
-                "right_sl": self.get_button_right_sl(),
-                "r": self.get_button_r(),
-                "zr": self.get_button_zr(),
+            "buttons": {},
+            "sticks": {},
+            "accel": self.get_accel(),
+            "gyro": self.get_gyro(),
+        }
+
+        if self.is_left():
+            status["buttons"] = {
                 "minus": self.get_button_minus(),
-                "plus": self.get_button_plus(),
-                "right_stick": self.get_button_right_stick(),
                 "left_stick": self.get_button_left_stick(),
-                "home": self.get_button_home(),
                 "capture": self.get_button_capture(),
-                "charging_grip": self.get_button_charging_grip(),
                 "down": self.get_button_down(),
                 "up": self.get_button_up(),
                 "right": self.get_button_right(),
@@ -355,20 +332,90 @@ class JoyCon:
                 "left_sl": self.get_button_left_sl(),
                 "l": self.get_button_l(),
                 "zl": self.get_button_zl(),
-            },
-            "sticks": {
+            }
+
+            status["sticks"] = {
                 "left": {
                     "horizontal": self.get_stick_left_horizontal(),
                     "vertical": self.get_stick_left_vertical(),
                 },
+            }
+
+        elif self.is_right():
+            status["buttons"] = {
+                "y": self.get_button_y(),
+                "x": self.get_button_x(),
+                "b": self.get_button_b(),
+                "a": self.get_button_a(),
+                "right_sr": self.get_button_right_sr(),
+                "right_sl": self.get_button_right_sl(),
+                "r": self.get_button_r(),
+                "zr": self.get_button_zr(),
+                "plus": self.get_button_plus(),
+                "right_stick": self.get_button_right_stick(),
+                "home": self.get_button_home(),
+                "charging_grip": self.get_button_charging_grip(),
+            }
+
+            status["sticks"] = {
                 "right": {
                     "horizontal": self.get_stick_right_horizontal(),
                     "vertical": self.get_stick_right_vertical(),
                 },
-            },
-            "accel": self.get_accel(),
-            "gyro": self.get_gyro(),
-        }
+            }
+
+        return status
+
+    # ------------------------------------------------------------------
+    # Translation to GamepadState
+    # ------------------------------------------------------------------
+
+    def _scale_stick(self, value):
+        return round(Stick.min_value() + value * (Stick.max_value() - Stick.min_value()) / 4095)
+
+    def get_gamepad_state(self):
+        if self.is_left():
+            return GamepadState(
+                buttons={
+                    Button.DPAD_UP: bool(self.get_button_up()),
+                    Button.DPAD_DOWN: bool(self.get_button_down()),
+                    Button.DPAD_LEFT: bool(self.get_button_left()),
+                    Button.DPAD_RIGHT: bool(self.get_button_right()),
+                    Button.L3: bool(self.get_button_left_stick()),
+                    Button.LB: bool(self.get_button_l()),
+                    Button.BACK: bool(self.get_button_minus()),
+                },
+                sticks={
+                    Stick.LX: self._scale_stick(self.get_stick_left_horizontal()),
+                    Stick.LY: self._scale_stick(self.get_stick_left_vertical()),
+                },
+                triggers={
+                    Trigger.LEFT: Trigger.max_value() if self.get_button_zl() else Trigger.min_value(),
+                }
+            )
+
+        if self.is_right():
+            return GamepadState(
+                buttons={
+                    Button.A: bool(self.get_button_a()),
+                    Button.B: bool(self.get_button_b()),
+                    Button.X: bool(self.get_button_x()),
+                    Button.Y: bool(self.get_button_y()),
+                    Button.R3: bool(self.get_button_right_stick()),
+                    Button.RB: bool(self.get_button_r()),
+                    Button.START: bool(self.get_button_plus()),
+                },
+                sticks={
+                    Stick.RX: self._scale_stick(self.get_stick_right_horizontal()),
+                    Stick.RY: self._scale_stick(self.get_stick_right_vertical()),
+                },
+                triggers={
+                    Trigger.RIGHT: Trigger.max_value() if self.get_button_zr() else Trigger.min_value(),
+                }
+            )
+
+        return GamepadState()
+
 
     # ------------------------------------------------------------------
     # Output (player LED)
