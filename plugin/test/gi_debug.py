@@ -1,4 +1,5 @@
 from talon import Module, cron
+import time
 
 from .gameinput_controller import get_controller
 
@@ -29,6 +30,9 @@ def poll_controller():
                 print(f"gameinput: target device VID=0x{TARGET_VENDOR_ID:04X} PID=0x{TARGET_PRODUCT_ID:04X} not found")
                 return
             print(f"gameinput: polling {_device}")
+            _controller.enable_joycon_standard_reporting(_device)
+            time.sleep(0.1)
+
 
     state = _controller.read_gamepad_state(_device)
 
