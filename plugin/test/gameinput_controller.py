@@ -7,7 +7,7 @@ does the actual COM calls to enumerate devices and read their state.
 """
 
 import ctypes
-from ctypes import byref, c_void_p, c_uint32, c_uint64, c_long, c_bool
+from ctypes import byref, c_void_p, c_uint32, c_uint64, c_uint8, c_long, c_bool
 
 from . import GameInput as GI
 
@@ -47,7 +47,7 @@ class GamepadDevice:
 
     def __repr__(self):
         name = self.display_name or "<unnamed>"
-        return f"GamepadDevice(VID=0x{self.vendor_id:04X}, PID=0x{self.product_id:04X}, name={name!r}, family={self.family.name}, kind={self.kind.value:0XX} )"
+        return f"GamepadDevice(VID=0x{self.vendor_id:04X}, PID=0x{self.product_id:04X}, name={name!r}, family={self.family.name}, kind={self.kind.value:08X} )"
 
 
 class GameInputController:
@@ -144,7 +144,7 @@ class GameInputController:
         """Return a dict of the current gamepad state for `device`, or
         None if no reading is currently available."""
 
-        reading = self.get_current_reading(device, kind=GI.GameInputKind.Gamepad)
+        reading = self.get_current_reading(device)
 
         if reading is None:
             return None
@@ -157,39 +157,84 @@ class GameInputController:
 
             self._print_reading(reading)
 
-            state = GI.GameInputGamepadState()
-            success = GI.IGameInputReading.getGamepadState(reading, byref(state))
+            input_kind = GI.GameInputKind(GI.IGameInputReading.getInputKind(reading))
 
-            if not success:
-                return None
+            if input_kind & GI.GameInputKind.Gamepad:
+                return self._gamepad_state_from_reading(reading)
 
-            buttons = GI.GameInputGamepadButtons(state.buttons)
+            if input_kind & GI.GameInputKind.RawDeviceReport:
+                return self._raw_state_from_reading(reading)
 
-            return {
-                "buttons": buttons,
-                "A": bool(buttons & GI.GameInputGamepadButtons.A),
-                "B": bool(buttons & GI.GameInputGamepadButtons.B),
-                "X": bool(buttons & GI.GameInputGamepadButtons.X),
-                "Y": bool(buttons & GI.GameInputGamepadButtons.Y),
-                "Menu": bool(buttons & GI.GameInputGamepadButtons.Menu),
-                "View": bool(buttons & GI.GameInputGamepadButtons.View),
-                "DPadUp": bool(buttons & GI.GameInputGamepadButtons.DPadUp),
-                "DPadDown": bool(buttons & GI.GameInputGamepadButtons.DPadDown),
-                "DPadLeft": bool(buttons & GI.GameInputGamepadButtons.DPadLeft),
-                "DPadRight": bool(buttons & GI.GameInputGamepadButtons.DPadRight),
-                "LeftShoulder": bool(buttons & GI.GameInputGamepadButtons.LeftShoulder),
-                "RightShoulder": bool(buttons & GI.GameInputGamepadButtons.RightShoulder),
-                "LeftThumbstick": bool(buttons & GI.GameInputGamepadButtons.LeftThumbstick),
-                "RightThumbstick": bool(buttons & GI.GameInputGamepadButtons.RightThumbstick),
-                "LeftTrigger": state.leftTrigger,
-                "RightTrigger": state.rightTrigger,
-                "LeftThumbstickX": state.leftThumbstickX,
-                "LeftThumbstickY": state.leftThumbstickY,
-                "RightThumbstickX": state.rightThumbstickX,
-                "RightThumbstickY": state.rightThumbstickY,
-            }
+            return None
         finally:
             GI.IUnknown.release(reading)
+
+    def _gamepad_state_from_reading(self, reading):
+        """Decode a Gamepad-kind IGameInputReading into a state dict."""
+
+        state = GI.GameInputGamepadState()
+        success = GI.IGameInputReading.getGamepadState(reading, byref(state))
+
+        if not success:
+            return None
+
+        buttons = GI.GameInputGamepadButtons(state.buttons)
+
+        return {
+            "type": "gamepad",
+            "buttons": buttons,
+            "A": bool(buttons & GI.GameInputGamepadButtons.A),
+            "B": bool(buttons & GI.GameInputGamepadButtons.B),
+            "X": bool(buttons & GI.GameInputGamepadButtons.X),
+            "Y": bool(buttons & GI.GameInputGamepadButtons.Y),
+            "Menu": bool(buttons & GI.GameInputGamepadButtons.Menu),
+            "View": bool(buttons & GI.GameInputGamepadButtons.View),
+            "DPadUp": bool(buttons & GI.GameInputGamepadButtons.DPadUp),
+            "DPadDown": bool(buttons & GI.GameInputGamepadButtons.DPadDown),
+            "DPadLeft": bool(buttons & GI.GameInputGamepadButtons.DPadLeft),
+            "DPadRight": bool(buttons & GI.GameInputGamepadButtons.DPadRight),
+            "LeftShoulder": bool(buttons & GI.GameInputGamepadButtons.LeftShoulder),
+            "RightShoulder": bool(buttons & GI.GameInputGamepadButtons.RightShoulder),
+            "LeftThumbstick": bool(buttons & GI.GameInputGamepadButtons.LeftThumbstick),
+            "RightThumbstick": bool(buttons & GI.GameInputGamepadButtons.RightThumbstick),
+            "LeftTrigger": state.leftTrigger,
+            "RightTrigger": state.rightTrigger,
+            "LeftThumbstickX": state.leftThumbstickX,
+            "LeftThumbstickY": state.leftThumbstickY,
+            "RightThumbstickX": state.rightThumbstickX,
+            "RightThumbstickY": state.rightThumbstickY,
+        }
+
+    def _raw_state_from_reading(self, reading):
+        """Decode a RawDeviceReport-kind IGameInputReading into a state
+        dict. Requires GI.IGameInputRawDeviceReport (getReportInfo /
+        getRawDataSize / getRawData) -- add that namespace to
+        GameInput.py if it isn't there yet, mirroring
+        IGameInputRawDeviceReport in the header."""
+
+        report = c_void_p()
+        success = GI.IGameInputReading.getRawReport(reading, byref(report))
+
+        if not success or not report.value:
+            return None
+
+        try:
+            report_info = GI.GameInputRawDeviceReportInfo()
+            GI.IGameInputRawDeviceReport.getReportInfo(report, byref(report_info))
+
+            size = GI.IGameInputRawDeviceReport.getRawDataSize(report)
+            buffer = (c_uint8 * size)()
+            actual_size = GI.IGameInputRawDeviceReport.getRawData(report, size, buffer)
+
+            return {
+                "type": "raw",
+                "reportKind": GI.GameInputRawDeviceReportKind(report_info.kind),
+                "reportId": report_info.id,
+                "size": actual_size,
+                "data": bytes(buffer[:actual_size]),
+            }
+        finally:
+            GI.IUnknown.release(report)
 
     def _get_reading_device_info(self, reading):
         device = c_void_p()
@@ -213,6 +258,8 @@ class GameInputController:
 
         if kind & GI.GameInputKind.Gamepad:
             self._print_gamepad_reading(reading)
+        elif kind & GI.GameInputKind.RawDeviceReport:
+            self._print_raw_reading(reading)
         else:
             print(f"No printer implemented for {kind}")
 
@@ -252,6 +299,32 @@ class GameInputController:
             print(f"  RightThumbstickY:    {state.rightThumbstickY:+.4f}")
             return
 
+    def _print_raw_reading(self, reading):
+        """Print the raw device report (input or output report bytes)."""
+
+        report = c_void_p()
+        success = GI.IGameInputReading.getRawReport(reading, byref(report))
+
+        if not success or not report.value:
+            print("Raw report: unavailable")
+            return
+
+        try:
+            report_info = GI.GameInputRawDeviceReportInfo()
+            GI.IGameInputRawDeviceReport.getReportInfo(report, byref(report_info))
+
+            size = GI.IGameInputRawDeviceReport.getRawDataSize(report)
+            buffer = (c_uint8 * size)()
+            actual_size = GI.IGameInputRawDeviceReport.getRawData(report, size, buffer)
+            data = bytes(buffer[:actual_size])
+
+            print("Raw report:")
+            print(f"  Kind:   {GI.GameInputRawDeviceReportKind(report_info.kind).name}")
+            print(f"  Id:     {report_info.id}")
+            print(f"  Size:   {actual_size}")
+            print(f"  Data:   {data.hex(' ')}")
+        finally:
+            GI.IUnknown.release(report)
 
     # ------------------------------------------------------------------
     # Lookup / diagnostics

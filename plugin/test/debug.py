@@ -9,10 +9,12 @@ _device = None
 _controller = get_controller(ignored_devices=[(0x045E, 0x028E)])
 
 
-TARGET_VENDOR_ID = None
-TARGET_PRODUCT_ID = None
+#TARGET_VENDOR_ID = None
+#TARGET_PRODUCT_ID = None
 #TARGET_VENDOR_ID = 0x1532
 #TARGET_PRODUCT_ID = 0x0A14
+TARGET_VENDOR_ID = 0x057E
+TARGET_PRODUCT_ID = 0x2006
 
 def poll_controller():
     """Called on every cron.interval tick while polling is active."""
@@ -34,12 +36,12 @@ def poll_controller():
         print("gameinput: no reading available")
         return
 
-    pressed = [name for name in (
-        "A", "B", "X", "Y", "Menu", "View",
-        "DPadUp", "DPadDown", "DPadLeft", "DPadRight",
-        "LeftShoulder", "RightShoulder",
-        "LeftThumbstick", "RightThumbstick",
-    ) if state[name]]
+    #pressed = [name for name in (
+    #    "A", "B", "X", "Y", "Menu", "View",
+    #    "DPadUp", "DPadDown", "DPadLeft", "DPadRight",
+    #    "LeftShoulder", "RightShoulder",
+    #    "LeftThumbstick", "RightThumbstick",
+    #) if state[name]]
 
     #print(
     #    f"gameinput: buttons=[{', '.join(pressed)}] "

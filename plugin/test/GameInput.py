@@ -21,6 +21,7 @@ from ctypes import (
     POINTER,
     Structure,
     Union,
+    byref,
     c_bool,
     c_char_p,
     c_float,
@@ -1086,6 +1087,13 @@ class IGameInputMapperIdx:
     GET_RACING_WHEEL_BUTTON_MAPPING_INFO = 9
 
 
+class IGameInputRawDeviceReportIdx:
+    GET_DEVICE = 3
+    GET_REPORT_INFO = 4
+    GET_RAW_DATA_SIZE = 5
+    GET_RAW_DATA = 6
+    SET_RAW_DATA = 7
+
 # ============================================================================
 # COM helpers
 # ============================================================================
@@ -1596,21 +1604,15 @@ class IGameInputReading:
         return method(interface, state)
 
     @staticmethod
-    def getRawReport(interface, reportKind, reportId, data, dataSize):
+    def getRawReport(interface, report):
         method = get_method(
             interface,
             IGameInputReadingIdx.GET_RAW_REPORT,
-            c_long,
-            [c_int32, c_uint32, c_void_p, c_uint32],
+            c_bool,
+            [POINTER(c_void_p)],
         )
-        return method(
-            interface,
-            int(reportKind),
-            reportId,
-            data,
-            dataSize,
-        )
-
+        return method(interface, report)
+    
 
 # ============================================================================
 # IGameInputDevice
@@ -1753,17 +1755,17 @@ class IGameInputDevice:
         return method(interface, indexes)
 
     @staticmethod
-    def createRawDeviceReport(interface, reportKind, reportId, report):
+    def createRawDeviceReport(interface, reportId, reportKind, report):
         method = get_method(
             interface,
             IGameInputDeviceIdx.CREATE_RAW_DEVICE_REPORT,
             c_long,
-            [c_int32, c_uint32, POINTER(c_void_p)],
+            [c_uint32, c_int32, POINTER(c_void_p)],
         )
         return method(
             interface,
-            int(reportKind),
             reportId,
+            int(reportKind),
             report,
         )
 
@@ -1964,6 +1966,61 @@ class IGameInputMapper:
             [c_uint32, POINTER(GameInputButtonMapping)],
         )
         return method(interface, index, mapping)
+
+# ============================================================================
+# IGameInputRawDeviceReport
+# ============================================================================
+
+class IGameInputRawDeviceReport:
+    @staticmethod
+    def getDevice(interface, device):
+        method = get_method(
+            interface,
+            IGameInputRawDeviceReportIdx.GET_DEVICE,
+            None,
+            [POINTER(c_void_p)],
+        )
+        return method(interface, device)
+
+    @staticmethod
+    def getReportInfo(interface, reportInfo):
+        method = get_method(
+            interface,
+            IGameInputRawDeviceReportIdx.GET_REPORT_INFO,
+            None,
+            [POINTER(GameInputRawDeviceReportInfo)],
+        )
+        return method(interface, reportInfo)
+
+    @staticmethod
+    def getRawDataSize(interface):
+        method = get_method(
+            interface,
+            IGameInputRawDeviceReportIdx.GET_RAW_DATA_SIZE,
+            c_size_t,
+            [],
+        )
+        return method(interface)
+
+    @staticmethod
+    def getRawData(interface, bufferSize, buffer):
+        method = get_method(
+            interface,
+            IGameInputRawDeviceReportIdx.GET_RAW_DATA,
+            c_size_t,
+            [c_size_t, c_void_p],
+        )
+        return method(interface, bufferSize, buffer)
+
+    @staticmethod
+    def setRawData(interface, bufferSize, buffer):
+        method = get_method(
+            interface,
+            IGameInputRawDeviceReportIdx.SET_RAW_DATA,
+            c_bool,
+            [c_size_t, c_void_p],
+        )
+        return method(interface, bufferSize, buffer)
 
 # ============================================================================
 # DLL loading / interface creation
