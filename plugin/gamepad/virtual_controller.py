@@ -4,12 +4,13 @@ import vgamepad as vg
 
 from .gamepad_types import Button, Trigger, Stick, GamepadState
 from .xinput_controller import XInputController, StandardGamepadTranslator, DpadToStickTranslator
+from .joycon_hid_controller import JoyCon, find_joycon_ids
 
 
 mod = Module()
 
 # -----------------------------------------------------------------------------
-# Physical controller(s)
+# XInput controller(s)
 # -----------------------------------------------------------------------------
 
 # TODO need to have a way of calibrating the stick and saving that calibration somewhere
@@ -26,6 +27,30 @@ standard_xbox_translator = StandardGamepadTranslator(
 
 xinput_xbox_controller = XInputController(0, standard_xbox_translator)
 xinput_fight_stick = XInputController(2, DpadToStickTranslator())
+
+# -----------------------------------------------------------------------------
+# Joy-Con controller(s)
+# -----------------------------------------------------------------------------
+
+_joycons = {}
+
+def check_connection():
+    """Look for new Joy-Cons and connect them."""
+    for vendor_id, product_id, serial in find_joycon_ids():
+        if serial in _joycons:
+            continue
+
+        try:
+            joycon = JoyCon(vendor_id, product_id, serial)
+            _joycons[serial] = joycon
+
+            print(f"joycon [{serial}]: connected")
+
+        except Exception as e:
+            print(f"joycon [{serial}]: failed to connect: {e}")
+
+# TODO uncomment to use joycon
+#connection_job = cron.interval("2s", check_connection)
 
 # -----------------------------------------------------------------------------
 # Virtual controller
@@ -77,7 +102,7 @@ def merge_states(states, external):
         return external
 
     buttons = {
-        button: any(state.buttons[button] for state in states) or external.buttons[button] > 0
+        button: any(state.buttons.get(button, False) for state in states) or external.buttons[button] > 0
         for button in Button
     }
 
@@ -85,7 +110,7 @@ def merge_states(states, external):
         stick: (
             external.sticks[stick]
             if external.sticks[stick] != 0
-            else max((state.sticks[stick] for state in states), key=abs, default=0)
+            else max((state.sticks.get(stick, 0) for state in states), key=abs, default=0)
         )
         for stick in Stick
     }
@@ -94,7 +119,7 @@ def merge_states(states, external):
         trigger: (
             external.triggers[trigger]
             if external.triggers[trigger] > 0
-            else max(state.triggers[trigger] for state in states)
+            else max((state.triggers.get(trigger, 0) for state in states), default=0)
         )
         for trigger in Trigger
     }
@@ -108,8 +133,29 @@ def merge_states(states, external):
 def poll_controller():
 
     global last_state
+    global _joycons
 
     physical_states = []
+    disconnected = []
+
+    for serial, joycon in list(_joycons.items()):
+        try:
+            if joycon.poll():
+                physical_states.append(joycon.get_gamepad_state())
+
+        except Exception as e:
+            print(f"joycon [{serial}]: disconnected: {e}")
+            disconnected.append(serial)
+
+    for serial in disconnected:
+        joycon = _joycons.pop(serial, None)
+
+        if joycon is not None:
+            try:
+                joycon.close()
+            except Exception:
+                pass
+
     physical_states.append(xinput_xbox_controller.read())
     physical_states.append(xinput_fight_stick.read())
 
@@ -142,7 +188,7 @@ def poll_controller():
     gamepad.update()
 
 
-cron_job = cron.interval("5ms", poll_controller)
+poll_job = cron.interval("4ms", poll_controller)
 
 # -----------------------------------------------------------------------------
 # Talon actions
