@@ -1,6 +1,7 @@
 from talon import Module, cron
+import time
 
-from .Joycon import JoyCon, find_joycon_ids
+from .joycon import JoyCon, get_device_ids
 from .gamepad_types import print_gamepad_state
 
 mod = Module()
@@ -9,23 +10,17 @@ _connection_job = None
 _poll_job = None
 _joycons = {}
 
-
 def poll_controller():
-    """Called every 100ms while Joy-Cons are connected."""
-
     global _poll_job
+    global _joycons
 
     disconnected = []
 
     for serial, joycon in list(_joycons.items()):
-        try:
-            if joycon.poll():
-                print(f"joycon [{serial}]: ", end="")
-                print_gamepad_state(joycon.get_gamepad_state())
-
-        except Exception as e:
-            print(f"joycon [{serial}]: disconnected: {e}")
+        if joycon.is_disconnected():
             disconnected.append(serial)
+        else:
+            print_gamepad_state(joycon.get_gamepad_state())
 
     for serial in disconnected:
         joycon = _joycons.pop(serial, None)
@@ -42,32 +37,20 @@ def poll_controller():
         _poll_job = None
         print("joycon: stopped polling")
 
-
 def check_connection():
-    """Look for new Joy-Cons and connect them."""
-
     global _poll_job
+    global _joycons
 
-    for vendor_id, product_id, serial in find_joycon_ids():
+    joycon_id_list = get_device_ids()
 
-        if serial in _joycons:
-            continue
+    for joycon_id in joycon_id_list:
+        if joycon_id[0] is not None:
+            serial = joycon_id[2]
 
-        print(
-            f"joycon: found new Joy-Con "
-            f"vid:0x{vendor_id:04x} "
-            f"pid:0x{product_id:04x} "
-            f"serial:{serial}"
-        )
-
-        try:
-            joycon = JoyCon(vendor_id, product_id, serial)
-            _joycons[serial] = joycon
-
-            print(f"joycon [{serial}]: connected")
-
-        except Exception as e:
-            print(f"joycon [{serial}]: failed to connect: {e}")
+            if serial not in _joycons:
+                joycon = JoyCon(*joycon_id)
+                _joycons[serial] = joycon
+                print(f"joycon [{serial}]: connected")
 
     # Start polling when the first Joy-Con connects.
     if _joycons and _poll_job is None:
@@ -98,6 +81,7 @@ class Actions:
 
         global _connection_job
         global _poll_job
+        global _joycons
 
         if _connection_job is not None:
             cron.cancel(_connection_job)
