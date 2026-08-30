@@ -1,81 +1,264 @@
-import time
 import hid
+import time
+import threading
+from typing import Optional
 from .gamepad_types import Button, Trigger, Stick, GamepadState
 
+# TODO: disconnect, power off sequence
 
 # ============================================================================
-# Constants
+# Discovery
 # ============================================================================
 
-NINTENDO_VENDOR_ID = 0x057E
+JOYCON_VENDOR_ID    = 0x057E
 JOYCON_L_PRODUCT_ID = 0x2006
 JOYCON_R_PRODUCT_ID = 0x2007
 JOYCON_PRODUCT_IDS = (JOYCON_L_PRODUCT_ID, JOYCON_R_PRODUCT_ID)
 
-_STANDARD_REPORT_ID = 0x30
-_STANDARD_REPORT_SIZE = 49
-_SUBCOMMAND_REPLY_REPORT_ID = 0x21
+def get_device_ids(debug=False):
+    """
+    returns a list of tuples like `(vendor_id, product_id, serial_number)`
+    """
+    devices = hid.enumerate(JOYCON_VENDOR_ID, 0)
 
-# Rumble is required framing on every output report even when unused;
-_NEUTRAL_RUMBLE_DATA = b"\x00\x01\x40\x40\x00\x01\x40\x40"
+    out = []
+    for device in devices:
+        vendor_id      = device["vendor_id"]
+        product_id     = device["product_id"]
+        product_string = device["product_string"]
+        serial = device.get('serial') or device.get("serial_number")
 
-def find_joycon_ids(product_id=None):
-    """Return a list of (vendor_id, product_id, serial) for connected
-    Joy-Cons. Pass product_id=JOYCON_L_PRODUCT_ID or
-    JOYCON_R_PRODUCT_ID to filter to one side."""
+        if vendor_id != JOYCON_VENDOR_ID:
+            continue
+        if product_id not in JOYCON_PRODUCT_IDS:
+            continue
+        if not product_string:
+            continue
 
-    wanted = (product_id,) if product_id is not None else JOYCON_PRODUCT_IDS
+        out.append((vendor_id, product_id, serial))
 
-    return [
-        (entry["vendor_id"], entry["product_id"], entry.get("serial_number"))
-        for entry in hid.enumerate(NINTENDO_VENDOR_ID, 0)
-        if entry["product_id"] in wanted
-    ]
+        if debug:
+            print(product_string)
+            print(f"\tvendor_id  is {vendor_id!r}")
+            print(f"\tproduct_id is {product_id!r}")
+            print(f"\tserial     is {serial!r}")
 
+    return out
 
-def _int16_le(low_byte, high_byte):
-    value = (high_byte << 8) | low_byte
-    return value if value < 0x8000 else value - 0x10000
-
+# ============================================================================
+# JoyCon
+# ============================================================================
 
 class JoyCon:
-    """A connected Joy-Con, Call poll() before reading any get_*() method to
-    refresh cached state"""
+    _INPUT_REPORT_SIZE = 49
+    _INPUT_REPORT_PERIOD = 0.015
+    _RUMBLE_DATA = b'\x00\x01\x40\x40\x00\x01\x40\x40'
 
-    def __init__(self, vendor_id, product_id, serial=None):
-        if vendor_id != NINTENDO_VENDOR_ID:
-            raise ValueError(f"vendor_id is invalid: {vendor_id!r}")
+    vendor_id  : int
+    product_id : int
+    serial     : Optional[str]
+    simple_mode: bool
+    color_body : (int, int, int)
+    color_btn  : (int, int, int)
+
+    def __init__(self, vendor_id: int, product_id: int, serial: str = None, simple_mode=False):
+        if vendor_id != JOYCON_VENDOR_ID:
+            raise ValueError(f'vendor_id is invalid: {vendor_id!r}')
+
         if product_id not in JOYCON_PRODUCT_IDS:
-            raise ValueError(f"product_id is invalid: {product_id!r}")
+            raise ValueError(f'product_id is invalid: {product_id!r}')
 
-        self.vendor_id = vendor_id
-        self.product_id = product_id
-        self.serial = serial
+        self.vendor_id   = vendor_id
+        self.product_id  = product_id
+        self.serial      = serial
+        self.simple_mode = simple_mode  # TODO: It's for reporting mode 0x3f
 
-        self._report = bytes(_STANDARD_REPORT_SIZE)
+        # setup internal state
+        self._input_hooks = []
+        self._input_report = bytes(self._INPUT_REPORT_SIZE)
         self._packet_number = 0
+        self.set_accel_calibration((0, 0, 0), (1, 1, 1))
+        self.set_gyro_calibration((0, 0, 0), (1, 1, 1))
+        self._stop_signal = threading.Event()
+        self._disconnected = threading.Event()
 
-        self._accel_offset = (0, 0, 0)
-        self._accel_coeff = (1.0, 1.0, 1.0)
-        self._gyro_offset = (0, 0, 0)
-        self._gyro_coeff = (1.0, 1.0, 1.0)
+        # connect to joycon
+        self._joycon_device = self._open(vendor_id, product_id, serial=None)
+        self._read_joycon_data()
+        self._setup_sensors()
 
-        self._device = hid.device()
-        self._device.open(vendor_id, product_id, serial)
+        # start talking with the joycon in a daemon thread
+        self._read_thread = threading.Thread(target=self._update_input_report, daemon = True)
+        self._read_thread.start()
 
-        self._read_calibration()
-        self._enable_standard_reporting()
+    def _open(self, vendor_id, product_id, serial):
+        try:
+            if hasattr(hid, "device"):  # hidapi
+                _joycon_device = hid.device()
+                _joycon_device.open(vendor_id, product_id, serial)
+            elif hasattr(hid, "Device"):  # hid
+                _joycon_device = hid.Device(vendor_id, product_id, serial)
+            else:
+                raise Exception("Implementation of hid is not recognized!")
+        except IOError as e:
+            raise IOError('joycon connect failed') from e
+        return _joycon_device
 
-    def close(self):
-        if getattr(self, "_device", None) is not None:
-            self._device.close()
-            self._device = None
+    def _close(self):
+        self._stop_signal.set()
+        if self._read_thread is not None and threading.current_thread() is not self._read_thread:
+            self._read_thread.join(timeout=0.2)
+            self._read_thread = None
+
+        if hasattr(self, "_joycon_device"):
+            self._joycon_device.close()
+            del self._joycon_device
+        
+    def _read_input_report(self) -> bytes:
+        return bytes(self._joycon_device.read(self._INPUT_REPORT_SIZE))
+
+    def _write_output_report(self, command, subcommand, argument):
+        # TODO: add documentation
+        self._joycon_device.write(b''.join([
+            command,
+            self._packet_number.to_bytes(1, byteorder='little'),
+            self._RUMBLE_DATA,
+            subcommand,
+            argument,
+        ]))
+        self._packet_number = (self._packet_number + 1) & 0xF
+
+    def _send_subcmd_get_response(self, subcommand, argument) -> (bool, bytes):
+        # TODO: handle subcmd when daemon is running
+        self._write_output_report(b'\x01', subcommand, argument)
+
+        report = self._read_input_report()
+        while report[0] != 0x21:  # TODO, avoid this, await daemon instead
+            report = self._read_input_report()
+
+        # TODO, remove, see the todo above
+        assert report[1:2] != subcommand, "THREAD carefully"
+
+        # TODO: determine if the cut bytes are worth anything
+
+        return report[13] & 0x80, report[13:]  # (ack, data)
+
+    def _spi_flash_read(self, address, size) -> bytes:
+        assert size <= 0x1d
+        argument = address.to_bytes(4, "little") + size.to_bytes(1, "little")
+        ack, report = self._send_subcmd_get_response(b'\x10', argument)
+        if not ack:
+            raise IOError("After SPI read @ {address:#06x}: got NACK")
+
+        if report[:2] != b'\x90\x10':
+            raise IOError("Something else than the expected ACK was recieved!")
+        assert report[2:7] == argument, (report[2:5], argument)
+
+        return report[7:size+7]
+
+    def _update_input_report(self):  # daemon thread
+        while not self._stop_signal.is_set():
+            try:
+                report = self._read_input_report()
+                # TODO, handle input reports of type 0x21 and 0x3f
+                while report[0] != 0x30:
+                    report = self._read_input_report()
+
+                self._input_report = report
+
+                for callback in self._input_hooks:
+                    callback(self)
+            except Exception:
+                self._disconnected.set()
+                break
+
+    def _read_joycon_data(self):
+        color_data = self._spi_flash_read(0x6050, 6)
+
+        # TODO: use this
+        # stick_cal_addr = 0x8012 if self.is_left else 0x801D
+        # stick_cal  = self._spi_flash_read(stick_cal_addr, 8)
+
+        # user IME data
+        if self._spi_flash_read(0x8026, 2) == b"\xB2\xA1":
+            # print(f"Calibrate {self.serial} IME with user data")
+            imu_cal = self._spi_flash_read(0x8028, 24)
+
+        # factory IME data
+        else:
+            # print(f"Calibrate {self.serial} IME with factory data")
+            imu_cal = self._spi_flash_read(0x6020, 24)
+
+        self.color_body = tuple(color_data[:3])
+        self.color_btn  = tuple(color_data[3:])
+
+        self.set_accel_calibration((
+                self._to_int16le_from_2bytes(imu_cal[ 0], imu_cal[ 1]),
+                self._to_int16le_from_2bytes(imu_cal[ 2], imu_cal[ 3]),
+                self._to_int16le_from_2bytes(imu_cal[ 4], imu_cal[ 5]),
+            ), (
+                self._to_int16le_from_2bytes(imu_cal[ 6], imu_cal[ 7]),
+                self._to_int16le_from_2bytes(imu_cal[ 8], imu_cal[ 9]),
+                self._to_int16le_from_2bytes(imu_cal[10], imu_cal[11]),
+            )
+        )
+        self.set_gyro_calibration((
+                self._to_int16le_from_2bytes(imu_cal[12], imu_cal[13]),
+                self._to_int16le_from_2bytes(imu_cal[14], imu_cal[15]),
+                self._to_int16le_from_2bytes(imu_cal[16], imu_cal[17]),
+            ), (
+                self._to_int16le_from_2bytes(imu_cal[18], imu_cal[19]),
+                self._to_int16le_from_2bytes(imu_cal[20], imu_cal[21]),
+                self._to_int16le_from_2bytes(imu_cal[22], imu_cal[23]),
+            )
+        )
+
+    def _setup_sensors(self):
+        # Enable 6 axis sensors
+        self._write_output_report(b'\x01', b'\x40', b'\x01')
+        # It needs delta time to update the setting
+        time.sleep(0.02)
+        # Change format of input report
+        self._write_output_report(b'\x01', b'\x03', b'\x30')
+
+    @staticmethod
+    def _to_int16le_from_2bytes(hbytebe, lbytebe):
+        uint16le = (lbytebe << 8) | hbytebe
+        int16le = uint16le if uint16le < 32768 else uint16le - 65536
+        return int16le
+
+    def _get_nbit_from_input_report(self, offset_byte, offset_bit, nbit):
+        byte = self._input_report[offset_byte]
+        return (byte >> offset_bit) & ((1 << nbit) - 1)
 
     def __del__(self):
-        try:
-            self.close()
-        except Exception:
-            pass
+        self._close()
+
+    def set_gyro_calibration(self, offset_xyz=None, coeff_xyz=None):
+        if offset_xyz:
+            self._GYRO_OFFSET_X, \
+            self._GYRO_OFFSET_Y, \
+            self._GYRO_OFFSET_Z = offset_xyz
+        if coeff_xyz:
+            cx, cy, cz = coeff_xyz
+            self._GYRO_COEFF_X = 0x343b / cx if cx != 0x343b else 1
+            self._GYRO_COEFF_Y = 0x343b / cy if cy != 0x343b else 1
+            self._GYRO_COEFF_Z = 0x343b / cz if cz != 0x343b else 1
+
+    def set_accel_calibration(self, offset_xyz=None, coeff_xyz=None):
+        if offset_xyz:
+            self._ACCEL_OFFSET_X, \
+            self._ACCEL_OFFSET_Y, \
+            self._ACCEL_OFFSET_Z = offset_xyz
+        if coeff_xyz:
+            cx, cy, cz = coeff_xyz
+            self._ACCEL_COEFF_X = 0x4000 / cx if cx != 0x4000 else 1
+            self._ACCEL_COEFF_Y = 0x4000 / cy if cy != 0x4000 else 1
+            self._ACCEL_COEFF_Z = 0x4000 / cz if cz != 0x4000 else 1
+
+    def register_update_hook(self, callback):
+        self._input_hooks.append(callback)
+        return callback  # this makes it so you could use it as a decorator
 
     def is_left(self):
         return self.product_id == JOYCON_L_PRODUCT_ID
@@ -83,288 +266,203 @@ class JoyCon:
     def is_right(self):
         return self.product_id == JOYCON_R_PRODUCT_ID
 
-    # ------------------------------------------------------------------
-    # Low-level HID I/O
-    # ------------------------------------------------------------------
-
-    def _read_report(self, timeout_ms):
-        data = self._device.read(_STANDARD_REPORT_SIZE, timeout_ms)
-        return bytes(data) if data else None
-
-    def _write_report(self, command, subcommand, argument):
-        payload = b"".join([
-            command,
-            self._packet_number.to_bytes(1, "little"),
-            _NEUTRAL_RUMBLE_DATA,
-            subcommand,
-            argument,
-        ])
-        self._device.write(payload)
-        self._packet_number = (self._packet_number + 1) & 0xF
-
-    def _send_subcommand(self, subcommand, argument, timeout_ms=100):
-        """Send a subcommand and block briefly for its 0x21 reply. This
-        is the one place we still wait synchronously -- it only happens
-        during setup (calibration read, enabling standard reporting),
-        never during regular polling."""
-
-        self._write_report(b"\x01", subcommand, argument)
-
-        deadline = time.monotonic() + (timeout_ms / 1000)
-        while time.monotonic() < deadline:
-            report = self._read_report(timeout_ms=int((deadline - time.monotonic()) * 1000) or 1)
-            if report and report[0] == _SUBCOMMAND_REPLY_REPORT_ID:
-                ack = bool(report[13] & 0x80)
-                return ack, report[13:]
-
-        raise IOError(f"No reply to subcommand {subcommand!r} within {timeout_ms}ms")
-
-    def _spi_flash_read(self, address, size):
-        assert size <= 0x1D
-        argument = address.to_bytes(4, "little") + size.to_bytes(1, "little")
-        ack, data = self._send_subcommand(b"\x10", argument)
-
-        if not ack:
-            raise IOError(f"SPI read @ {address:#06x} was NACKed")
-        if data[:2] != b"\x90\x10":
-            raise IOError("Unexpected SPI read reply header")
-
-        return data[7:7 + size]
-
-    # ------------------------------------------------------------------
-    # Setup
-    # ------------------------------------------------------------------
-
-    def _read_calibration(self):
-        color = self._spi_flash_read(0x6050, 6)
-        self.color_body = tuple(color[:3])
-        self.color_button = tuple(color[3:])
-
-        has_user_calibration = self._spi_flash_read(0x8026, 2) == b"\xB2\xA1"
-        imu_cal = self._spi_flash_read(0x8028 if has_user_calibration else 0x6020, 24)
-
-        self._accel_offset = tuple(_int16_le(imu_cal[i], imu_cal[i + 1]) for i in (0, 2, 4))
-        accel_raw_coeff = tuple(_int16_le(imu_cal[i], imu_cal[i + 1]) for i in (6, 8, 10))
-        self._accel_coeff = tuple(0x4000 / c if c != 0x4000 else 1.0 for c in accel_raw_coeff)
-
-        self._gyro_offset = tuple(_int16_le(imu_cal[i], imu_cal[i + 1]) for i in (12, 14, 16))
-        gyro_raw_coeff = tuple(_int16_le(imu_cal[i], imu_cal[i + 1]) for i in (18, 20, 22))
-        self._gyro_coeff = tuple(0x343B / c if c != 0x343B else 1.0 for c in gyro_raw_coeff)
-
-    def _enable_standard_reporting(self):
-        # Enable the 6-axis IMU.
-        self._write_report(b"\x01", b"\x40", b"\x01")
-        time.sleep(0.02)
-        # Switch to standard full input reports (0x30: buttons, sticks, IMU).
-        self._write_report(b"\x01", b"\x03", b"\x30")
-        time.sleep(0.02)
-
-    # ------------------------------------------------------------------
-    # Polling
-    # ------------------------------------------------------------------
-
-    def poll(self, timeout_ms=0, max_drain=8):
-        """Refresh cached state from the HID queue without blocking
-        (beyond `timeout_ms`, which defaults to non-blocking).
-
-        Drains up to `max_drain` pending reports so a poll after a gap
-        (e.g. a slow cron tick) picks up the freshest data rather than
-        the oldest queued one, and keeps only the last standard (0x30)
-        report seen. Safe to call as often as you like -- if nothing is
-        queued it returns False immediately.
-        """
-
-        updated = False
-
-        for _ in range(max_drain):
-            report = self._read_report(timeout_ms)
-            if report is None:
-                break
-            if report[0] == _STANDARD_REPORT_ID and len(report) >= _STANDARD_REPORT_SIZE:
-                self._report = report
-                updated = True
-
-        return updated
-
-    # ------------------------------------------------------------------
-    # Cached-state accessors (reflect whatever the last poll() saw)
-    # ------------------------------------------------------------------
-
-    def _bits(self, byte_offset, bit_offset, bit_count):
-        return (self._report[byte_offset] >> bit_offset) & ((1 << bit_count) - 1)
-
     def get_battery_charging(self):
-        return self._bits(2, 4, 1)
+        return self._get_nbit_from_input_report(2, 4, 1)
 
     def get_battery_level(self):
-        return self._bits(2, 5, 3)
+        return self._get_nbit_from_input_report(2, 5, 3)
 
-    # Right-side / shared buttons (byte 3: Y X B A SR SL R ZR)
     def get_button_y(self):
-        return self._bits(3, 0, 1)
+        return self._get_nbit_from_input_report(3, 0, 1)
 
     def get_button_x(self):
-        return self._bits(3, 1, 1)
+        return self._get_nbit_from_input_report(3, 1, 1)
 
     def get_button_b(self):
-        return self._bits(3, 2, 1)
+        return self._get_nbit_from_input_report(3, 2, 1)
 
     def get_button_a(self):
-        return self._bits(3, 3, 1)
+        return self._get_nbit_from_input_report(3, 3, 1)
 
     def get_button_right_sr(self):
-        return self._bits(3, 4, 1)
+        return self._get_nbit_from_input_report(3, 4, 1)
 
     def get_button_right_sl(self):
-        return self._bits(3, 5, 1)
+        return self._get_nbit_from_input_report(3, 5, 1)
 
     def get_button_r(self):
-        return self._bits(3, 6, 1)
+        return self._get_nbit_from_input_report(3, 6, 1)
 
     def get_button_zr(self):
-        return self._bits(3, 7, 1)
+        return self._get_nbit_from_input_report(3, 7, 1)
 
-    # Shared buttons (byte 4: Minus Plus RStick LStick Home Capture - ChargingGrip)
     def get_button_minus(self):
-        return self._bits(4, 0, 1)
+        return self._get_nbit_from_input_report(4, 0, 1)
 
     def get_button_plus(self):
-        return self._bits(4, 1, 1)
+        return self._get_nbit_from_input_report(4, 1, 1)
 
-    def get_button_right_stick(self):
-        return self._bits(4, 2, 1)
+    def get_button_r_stick(self):
+        return self._get_nbit_from_input_report(4, 2, 1)
 
-    def get_button_left_stick(self):
-        return self._bits(4, 3, 1)
+    def get_button_l_stick(self):
+        return self._get_nbit_from_input_report(4, 3, 1)
 
     def get_button_home(self):
-        return self._bits(4, 4, 1)
+        return self._get_nbit_from_input_report(4, 4, 1)
 
     def get_button_capture(self):
-        return self._bits(4, 5, 1)
+        return self._get_nbit_from_input_report(4, 5, 1)
 
     def get_button_charging_grip(self):
-        return self._bits(4, 7, 1)
+        return self._get_nbit_from_input_report(4, 7, 1)
 
-    # Left-side buttons / d-pad (byte 5: Down Up Right Left SR SL L ZL)
     def get_button_down(self):
-        return self._bits(5, 0, 1)
+        return self._get_nbit_from_input_report(5, 0, 1)
 
     def get_button_up(self):
-        return self._bits(5, 1, 1)
+        return self._get_nbit_from_input_report(5, 1, 1)
 
     def get_button_right(self):
-        return self._bits(5, 2, 1)
+        return self._get_nbit_from_input_report(5, 2, 1)
 
     def get_button_left(self):
-        return self._bits(5, 3, 1)
+        return self._get_nbit_from_input_report(5, 3, 1)
 
     def get_button_left_sr(self):
-        return self._bits(5, 4, 1)
+        return self._get_nbit_from_input_report(5, 4, 1)
 
     def get_button_left_sl(self):
-        return self._bits(5, 5, 1)
+        return self._get_nbit_from_input_report(5, 5, 1)
 
     def get_button_l(self):
-        return self._bits(5, 6, 1)
+        return self._get_nbit_from_input_report(5, 6, 1)
 
     def get_button_zl(self):
-        return self._bits(5, 7, 1)
+        return self._get_nbit_from_input_report(5, 7, 1)
 
-    # Analog sticks: 12-bit values packed across 3 bytes each.
     def get_stick_left_horizontal(self):
-        return self._bits(6, 0, 8) | (self._bits(7, 0, 4) << 8)
+        return self._get_nbit_from_input_report(6, 0, 8) \
+            | (self._get_nbit_from_input_report(7, 0, 4) << 8)
 
     def get_stick_left_vertical(self):
-        return self._bits(7, 4, 4) | (self._bits(8, 0, 8) << 4)
+        return self._get_nbit_from_input_report(7, 4, 4) \
+            | (self._get_nbit_from_input_report(8, 0, 8) << 4)
 
     def get_stick_right_horizontal(self):
-        return self._bits(9, 0, 8) | (self._bits(10, 0, 4) << 8)
+        return self._get_nbit_from_input_report(9, 0, 8) \
+            | (self._get_nbit_from_input_report(10, 0, 4) << 8)
 
     def get_stick_right_vertical(self):
-        return self._bits(10, 4, 4) | (self._bits(11, 0, 8) << 4)
+        return self._get_nbit_from_input_report(10, 4, 4) \
+            | (self._get_nbit_from_input_report(11, 0, 8) << 4)
 
-    # IMU: 3 samples per report, 12 bytes each, starting at byte 13.
-    def get_accel(self, sample_index=0):
-        base = 13 + sample_index * 12
-        x = _int16_le(self._report[base], self._report[base + 1])
-        y = _int16_le(self._report[base + 2], self._report[base + 3])
-        z = _int16_le(self._report[base + 4], self._report[base + 5])
-        return (
-            (x - self._accel_offset[0]) * self._accel_coeff[0],
-            (y - self._accel_offset[1]) * self._accel_coeff[1],
-            (z - self._accel_offset[2]) * self._accel_coeff[2],
-        )
+    def get_accel_x(self, sample_idx=0):
+        if sample_idx not in (0, 1, 2):
+            raise IndexError('sample_idx should be between 0 and 2')
+        data = self._to_int16le_from_2bytes(
+            self._input_report[13 + sample_idx * 12],
+            self._input_report[14 + sample_idx * 12])
+        return (data - self._ACCEL_OFFSET_X) * self._ACCEL_COEFF_X
 
-    def get_gyro(self, sample_index=0):
-        base = 13 + sample_index * 12 + 6
-        x = _int16_le(self._report[base], self._report[base + 1])
-        y = _int16_le(self._report[base + 2], self._report[base + 3])
-        z = _int16_le(self._report[base + 4], self._report[base + 5])
-        return (
-            (x - self._gyro_offset[0]) * self._gyro_coeff[0],
-            (y - self._gyro_offset[1]) * self._gyro_coeff[1],
-            (z - self._gyro_offset[2]) * self._gyro_coeff[2],
-        )
+    def get_accel_y(self, sample_idx=0):
+        if sample_idx not in (0, 1, 2):
+            raise IndexError('sample_idx should be between 0 and 2')
+        data = self._to_int16le_from_2bytes(
+            self._input_report[15 + sample_idx * 12],
+            self._input_report[16 + sample_idx * 12])
+        return (data - self._ACCEL_OFFSET_Y) * self._ACCEL_COEFF_Y
 
-    def get_status(self):
-        status = {
+    def get_accel_z(self, sample_idx=0):
+        if sample_idx not in (0, 1, 2):
+            raise IndexError('sample_idx should be between 0 and 2')
+        data = self._to_int16le_from_2bytes(
+            self._input_report[17 + sample_idx * 12],
+            self._input_report[18 + sample_idx * 12])
+        return (data - self._ACCEL_OFFSET_Z) * self._ACCEL_COEFF_Z
+
+    def get_gyro_x(self, sample_idx=0):
+        if sample_idx not in (0, 1, 2):
+            raise IndexError('sample_idx should be between 0 and 2')
+        data = self._to_int16le_from_2bytes(
+            self._input_report[19 + sample_idx * 12],
+            self._input_report[20 + sample_idx * 12])
+        return (data - self._GYRO_OFFSET_X) * self._GYRO_COEFF_X
+
+    def get_gyro_y(self, sample_idx=0):
+        if sample_idx not in (0, 1, 2):
+            raise IndexError('sample_idx should be between 0 and 2')
+        data = self._to_int16le_from_2bytes(
+            self._input_report[21 + sample_idx * 12],
+            self._input_report[22 + sample_idx * 12])
+        return (data - self._GYRO_OFFSET_Y) * self._GYRO_COEFF_Y
+
+    def get_gyro_z(self, sample_idx=0):
+        if sample_idx not in (0, 1, 2):
+            raise IndexError('sample_idx should be between 0 and 2')
+        data = self._to_int16le_from_2bytes(
+            self._input_report[23 + sample_idx * 12],
+            self._input_report[24 + sample_idx * 12])
+        return (data - self._GYRO_OFFSET_Z) * self._GYRO_COEFF_Z
+
+    def get_status(self) -> dict:
+        return {
             "battery": {
                 "charging": self.get_battery_charging(),
                 "level": self.get_battery_level(),
             },
-            "buttons": {},
-            "sticks": {},
-            "accel": self.get_accel(),
-            "gyro": self.get_gyro(),
-        }
-
-        if self.is_left():
-            status["buttons"] = {
-                "minus": self.get_button_minus(),
-                "left_stick": self.get_button_left_stick(),
-                "capture": self.get_button_capture(),
-                "down": self.get_button_down(),
-                "up": self.get_button_up(),
-                "right": self.get_button_right(),
-                "left": self.get_button_left(),
-                "left_sr": self.get_button_left_sr(),
-                "left_sl": self.get_button_left_sl(),
-                "l": self.get_button_l(),
-                "zl": self.get_button_zl(),
-            }
-
-            status["sticks"] = {
+            "buttons": {
+                "right": {
+                    "y": self.get_button_y(),
+                    "x": self.get_button_x(),
+                    "b": self.get_button_b(),
+                    "a": self.get_button_a(),
+                    "sr": self.get_button_right_sr(),
+                    "sl": self.get_button_right_sl(),
+                    "r": self.get_button_r(),
+                    "zr": self.get_button_zr(),
+                },
+                "shared": {
+                    "minus": self.get_button_minus(),
+                    "plus": self.get_button_plus(),
+                    "r-stick": self.get_button_r_stick(),
+                    "l-stick": self.get_button_l_stick(),
+                    "home": self.get_button_home(),
+                    "capture": self.get_button_capture(),
+                    "charging-grip": self.get_button_charging_grip(),
+                },
+                "left": {
+                    "down": self.get_button_down(),
+                    "up": self.get_button_up(),
+                    "right": self.get_button_right(),
+                    "left": self.get_button_left(),
+                    "sr": self.get_button_left_sr(),
+                    "sl": self.get_button_left_sl(),
+                    "l": self.get_button_l(),
+                    "zl": self.get_button_zl(),
+                }
+            },
+            "analog-sticks": {
                 "left": {
                     "horizontal": self.get_stick_left_horizontal(),
                     "vertical": self.get_stick_left_vertical(),
                 },
-            }
-
-        elif self.is_right():
-            status["buttons"] = {
-                "y": self.get_button_y(),
-                "x": self.get_button_x(),
-                "b": self.get_button_b(),
-                "a": self.get_button_a(),
-                "right_sr": self.get_button_right_sr(),
-                "right_sl": self.get_button_right_sl(),
-                "r": self.get_button_r(),
-                "zr": self.get_button_zr(),
-                "plus": self.get_button_plus(),
-                "right_stick": self.get_button_right_stick(),
-                "home": self.get_button_home(),
-                "charging_grip": self.get_button_charging_grip(),
-            }
-
-            status["sticks"] = {
                 "right": {
                     "horizontal": self.get_stick_right_horizontal(),
                     "vertical": self.get_stick_right_vertical(),
                 },
-            }
-
-        return status
+            },
+            "accel": {
+                "x": self.get_accel_x(),
+                "y": self.get_accel_y(),
+                "z": self.get_accel_z(),
+            },
+            "gyro": {
+                "x": self.get_gyro_x(),
+                "y": self.get_gyro_y(),
+                "z": self.get_gyro_z(),
+            },
+        }
 
     # ------------------------------------------------------------------
     # Translation to GamepadState
@@ -381,7 +479,7 @@ class JoyCon:
                     Button.DPAD_DOWN: bool(self.get_button_down()),
                     Button.DPAD_LEFT: bool(self.get_button_left()),
                     Button.DPAD_RIGHT: bool(self.get_button_right()),
-                    Button.L3: bool(self.get_button_left_stick()),
+                    Button.L3: bool(self.get_button_l_stick()),
                     Button.LB: bool(self.get_button_l()),
                     Button.BACK: bool(self.get_button_minus()),
                 },
@@ -401,7 +499,7 @@ class JoyCon:
                     Button.B: bool(self.get_button_b()),
                     Button.X: bool(self.get_button_x()),
                     Button.Y: bool(self.get_button_y()),
-                    Button.R3: bool(self.get_button_right_stick()),
+                    Button.R3: bool(self.get_button_r_stick()),
                     Button.RB: bool(self.get_button_r()),
                     Button.START: bool(self.get_button_plus()),
                 },
@@ -416,11 +514,23 @@ class JoyCon:
 
         return GamepadState()
 
+    def set_player_lamp_on(self, on_pattern: int):
+        self._write_output_report(
+            b'\x01', b'\x30',
+            (on_pattern & 0xF).to_bytes(1, byteorder='little'))
 
-    # ------------------------------------------------------------------
-    # Output (player LED)
-    # ------------------------------------------------------------------
+    def set_player_lamp_flashing(self, flashing_pattern: int):
+        self._write_output_report(
+            b'\x01', b'\x30',
+            ((flashing_pattern & 0xF) << 4).to_bytes(1, byteorder='little'))
 
-    def set_player_lamp(self, pattern):
-        self._write_report(b"\x01", b"\x30", pattern.to_bytes(1, "little"))
+    def set_player_lamp(self, pattern: int):
+        self._write_output_report(
+            b'\x01', b'\x30',
+            pattern.to_bytes(1, byteorder='little'))
 
+    def disconnect_device(self):
+        self._write_output_report(b'\x01', b'\x06', b'\x00')
+
+    def is_disconnected(self):
+        return self._disconnected.is_set()

@@ -19,7 +19,7 @@ def get_device_ids(debug=False):
     """
     returns a list of tuples like `(vendor_id, product_id, serial_number)`
     """
-    devices = hid.enumerate(0, 0)
+    devices = hid.enumerate(JOYCON_VENDOR_ID, 0)
 
     out = []
     for device in devices:

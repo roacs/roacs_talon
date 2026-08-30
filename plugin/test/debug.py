@@ -1,7 +1,7 @@
 from talon import Module, cron
 import time
 
-from .joycon import JoyCon, get_device_ids
+from .joycon_hid_controller import JoyCon, get_device_ids
 from .gamepad_types import print_gamepad_state
 
 mod = Module()
