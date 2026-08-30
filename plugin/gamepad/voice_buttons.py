@@ -1,5 +1,5 @@
 from talon import Module, actions
-from .xinput_buttons import Button, Trigger
+from .gamepad_types import Button, Trigger
 
 mod = Module()
 

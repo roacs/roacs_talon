@@ -2,38 +2,34 @@ from talon import Module, cron
 import threading
 import vgamepad as vg
 
-from .xinput_buttons import Button, Trigger, Axis
-from .xinput_controller import XInputController, ControllerState, StandardGamepadTranslator, DpadToStickTranslator
+from .gamepad_types import Button, Trigger, Stick, GamepadState
+from .xinput_controller import XInputController, StandardGamepadTranslator, DpadToStickTranslator
 
 
 mod = Module()
 
-# -----------------------------
+# -----------------------------------------------------------------------------
 # Physical controller(s)
-# -----------------------------
+# -----------------------------------------------------------------------------
 
 # TODO need to have a way of calibrating the stick and saving that calibration somewhere
 #      having to change them here manually is no bueno
-standard_xbox_controller = StandardGamepadTranslator(
+standard_xbox_translator = StandardGamepadTranslator(
     centers={
-        "LX": -1351,
-        "LY": 0,
-        "RX": -2240,
-        "RY": -512,
+        Stick.LX: -1351,
+        Stick.LY: 0,
+        Stick.RX: -2240,
+        Stick.RY: -512,
     },
     apply_calibration=True,
 )
 
-fight_stick_dpad_as_analog_stick = DpadToStickTranslator()
+xinput_xbox_controller = XInputController(0, standard_xbox_translator)
+xinput_fight_stick = XInputController(2, DpadToStickTranslator())
 
-controller = XInputController({
-    0: standard_xbox_controller,
-    2: fight_stick_dpad_as_analog_stick
-})
-
-# -----------------------------
+# -----------------------------------------------------------------------------
 # Virtual controller
-# -----------------------------
+# -----------------------------------------------------------------------------
 
 gamepad = vg.VX360Gamepad()
 gamepad.reset()
@@ -56,73 +52,101 @@ virtual_button_map = {
     Button.DPAD_RIGHT: vg.XUSB_BUTTON.XUSB_GAMEPAD_DPAD_RIGHT,
 }
 
-# -----------------------------
+# -----------------------------------------------------------------------------
 # Inputs External from the physical controller
 # Counters are used for buttons/triggers and values for sticks
-# -----------------------------
+# -----------------------------------------------------------------------------
 
-external_state = {
-    **{item: 0 for item in list(Button) + list(Trigger)},
-    Axis.LX: None,
-    Axis.LY: None
-}
+external_state = GamepadState(
+    buttons={button: 0 for button in Button},
+    sticks={stick: 0 for stick in Stick},
+    triggers={trigger: 0 for trigger in Trigger},
+)
 
 external_state_lock = threading.Lock()
 
 
-# -----------------------------
-# Poll XInput and update ViGEm
-# -----------------------------
+# -----------------------------------------------------------------------------
+# Poll Physical Controllers and XInput and update ViGEm 
+# -----------------------------------------------------------------------------
 
-last_physical_state = None
-last_external_state = None
+last_state = None
 
-# TODO revisit this logic and see if there are any bugs
-#      do we need to abort if the state is the same? is writing to virtual at 4ms costly?
+def merge_states(states, external):
+    if not states:
+        return external
+
+    buttons = {
+        button: any(state.buttons[button] for state in states) or external.buttons[button] > 0
+        for button in Button
+    }
+
+    sticks = {
+        stick: (
+            external.sticks[stick]
+            if external.sticks[stick] != 0
+            else max((state.sticks[stick] for state in states), key=abs, default=0)
+        )
+        for stick in Stick
+    }
+
+    triggers = {
+        trigger: (
+            external.triggers[trigger]
+            if external.triggers[trigger] > 0
+            else max(state.triggers[trigger] for state in states)
+        )
+        for trigger in Trigger
+    }
+
+    return GamepadState(
+        buttons=buttons,
+        sticks=sticks,
+        triggers=triggers,
+    )
+
 def poll_controller():
 
-    global last_physical_state
-    global last_external_state
+    global last_state
 
-    physical = controller.read()
-
-    if physical is None:
-        return
+    physical_states = []
+    physical_states.append(xinput_xbox_controller.read())
+    physical_states.append(xinput_fight_stick.read())
 
     with external_state_lock:
-        external = external_state.copy()
+        external = GamepadState(
+            buttons=external_state.buttons.copy(),
+            sticks=external_state.sticks.copy(),
+            triggers=external_state.triggers.copy(),
+        )
 
-    if (physical == last_physical_state and external == last_external_state):
+    merged_state = merge_states(physical_states, external)
+
+    if merged_state == last_state:
         return
 
-    last_physical_state = physical
-    last_external_state = external
+    last_state = merged_state
 
     for button, virtual_button in virtual_button_map.items():
-        pressed = (physical.buttons[button] or external[button] > 0)
-
-        if pressed:
+        if merged_state.buttons[button]:
             gamepad.press_button(virtual_button)
         else:
             gamepad.release_button(virtual_button)
 
+    gamepad.left_joystick(merged_state.sticks[Stick.LX], merged_state.sticks[Stick.LY])
+    gamepad.right_joystick(merged_state.sticks[Stick.RX], merged_state.sticks[Stick.RY])
 
-    lx = physical.LX if external[Axis.LX] is None else external[Axis.LX]
-    ly = physical.LY if external[Axis.LY] is None else external[Axis.LY]
-    gamepad.left_joystick(lx, ly)
-    gamepad.right_joystick(physical.RX, physical.RY)
-
-    gamepad.left_trigger(255 if external[Trigger.LEFT] > 0 else physical.LT)
-    gamepad.right_trigger(255 if external[Trigger.RIGHT] > 0 else physical.RT)
+    gamepad.left_trigger(merged_state.triggers[Trigger.LEFT])
+    gamepad.right_trigger(merged_state.triggers[Trigger.RIGHT])
 
     gamepad.update()
 
 
-cron_job = cron.interval("4ms", poll_controller)
+cron_job = cron.interval("5ms", poll_controller)
 
-# -----------------------------
+# -----------------------------------------------------------------------------
 # Talon actions
-# -----------------------------
+# -----------------------------------------------------------------------------
 
 @mod.action_class
 class Actions:
@@ -148,27 +172,25 @@ class Actions:
 
     def controller_left_stick(x: int, y: int):
         """Move the left analog stick. Physical input disabled until controller_left_stick_clear called."""
-        x = max(-32768, min(32767, x))
-        y = max(-32768, min(32767, y))
+        x = max(Stick.min_value(), min(Stick.max_value(), x))
+        y = max(Stick.min_value(), min(Stick.max_value(), y))
 
         with external_state_lock:
-            external_state[Axis.LX] = x
-            external_state[Axis.LY] = y
+            external_state.sticks[Stick.LX] = x
+            external_state.sticks[Stick.LY] = y
 
     def controller_left_stick_clear():
         """Return left stick control to the physical controller."""
         with external_state_lock:
-            external_state[Axis.LX] = None
-            external_state[Axis.LY] = None
-
+            external_state.sticks[Stick.LX] = 0
+            external_state.sticks[Stick.LY] = 0
 
 def increment_external_state(buttons):
     with external_state_lock:
         for button in buttons:
-            external_state[button] += 1
+            external_state.buttons[button] += 1
 
 def decrement_external_state(buttons):
     with external_state_lock:
         for button in buttons:
-            external_state[button] = max(0, external_state[button] - 1)
-
+            external_state.buttons[button] = max(0, external_state.buttons[button] - 1)
