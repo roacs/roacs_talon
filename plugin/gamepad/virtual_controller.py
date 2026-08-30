@@ -13,6 +13,8 @@ mod = Module()
 # XInput controller(s)
 # -----------------------------------------------------------------------------
 
+_xinputs = []
+
 # TODO need to have a way of calibrating the stick and saving that calibration somewhere
 #      having to change them here manually is no bueno
 standard_xbox_translator = StandardGamepadTranslator(
@@ -25,8 +27,8 @@ standard_xbox_translator = StandardGamepadTranslator(
     apply_calibration=True,
 )
 
-xinput_xbox_controller = XInputController(0, standard_xbox_translator)
-xinput_fight_stick = XInputController(2, DpadToStickTranslator())
+_xinputs.append(XInputController(1, standard_xbox_translator))
+_xinputs.append(XInputController(2, DpadToStickTranslator()))
 
 # -----------------------------------------------------------------------------
 # Joy-Con controller(s)
@@ -47,7 +49,7 @@ def check_connection():
                 print(f"joycon [{serial}]: failed to connect: {e}")
 
 # TODO uncomment to use joycon
-connection_job = cron.interval("2s", check_connection)
+#connection_job = cron.interval("2s", check_connection)
 
 # -----------------------------------------------------------------------------
 # Virtual controller
@@ -89,12 +91,13 @@ external_state_lock = threading.Lock()
 
 
 # -----------------------------------------------------------------------------
-# Poll Physical Controllers and XInput and update ViGEm 
+# Poll Controllers and update ViGEm 
 # -----------------------------------------------------------------------------
 
 last_state = None
 
 def merge_states(states, external):
+    states = [state for state in states if state is not None]
     if not states:
         return external
 
@@ -131,31 +134,13 @@ def poll_controller():
 
     global last_state
     global _joycons
+    global _xinputs
 
     physical_states = []
     disconnected = []
 
-#
-#    for serial, joycon in list(_joycons.items()):
-#        try:
-#            if joycon.poll():
-#                physical_states.append(joycon.get_gamepad_state())
-#
-#        except Exception as e:
-#            print(f"joycon [{serial}]: disconnected: {e}")
-#            disconnected.append(serial)
-#
-#    for serial in disconnected:
-#        joycon = _joycons.pop(serial, None)
-#
-#        if joycon is not None:
-#            try:
-#                joycon.close()
-#            except Exception:
-#                pass
-
-    physical_states.append(xinput_xbox_controller.read())
-    physical_states.append(xinput_fight_stick.read())
+    for xinput in _xinputs:
+        physical_states.append(xinput.read())
     for serial, joycon in list(_joycons.items()):
         physical_states.append(joycon.get_gamepad_state())
 
