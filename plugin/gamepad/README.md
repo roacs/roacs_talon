@@ -16,6 +16,7 @@ a dpad) into an approximation of an analog joystick.
 ### joycon_hid_controller.py
 Wrapper around joycon, mostly taken from tocoteron/joycon-python.
 Exposes state of the physical controller through a dataclass GamepadState.
+NOTE: The joycon implementation uses a background thread to keep the state up-to-date.
 
 ### virtual_controller.py
 Holds the instance of a virtual gamepad from vgamepad.  Polls the physical
@@ -41,3 +42,5 @@ Using voice phrases to push buttons on the virtual controller.
   - Keep support for and maybe streamline the "translator" abstraction that goes from physical
     inputs into virtual (i.e. dpad to joystick).
   - May need to abstract the controller buttons to east/west/north/south to use nintendo/playstation
+  - Option to change joycon buttons to xbox layout
+  - minimize the joycon code
