@@ -49,17 +49,15 @@ class GamepadState:
     sticks: dict[Stick, int] = field(default_factory=lambda: {stick: 0 for stick in Stick})
     triggers: dict[Trigger, int] = field(default_factory=lambda: {trigger: 0 for trigger in Trigger})
 
+    def __repr__(self):
+        buttons = [b.value for b, v in self.buttons.items() if v]
+        sticks = [f"{s.value}={self.sticks[s]}" for s in self.sticks]
+        triggers = [f"{t.value}={self.triggers[t]}" for t in self.triggers]
+        return f"GamepadState(Buttons=[{','.join(buttons)}] Sticks=[{','.join(sticks)}] Triggers=[{','.join(triggers)}])"
+
 @dataclass
 class StickCalibration:
     center: int
     negative_scale: float
     positive_scale: float
 
-
-
-def print_gamepad_state(state: GamepadState):
-    buttons = [b.value for b, v in state.buttons.items() if v]
-    sticks = [f"{s.value}={state.sticks[s]}" for s in state.sticks]
-    triggers = [f"{t.value}={state.triggers[t]}" for t in state.triggers]
-
-    print(f"Buttons=[{','.join(buttons)}] Sticks=[{','.join(sticks)}] Triggers=[{','.join(triggers)}]")

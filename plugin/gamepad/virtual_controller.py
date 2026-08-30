@@ -3,12 +3,27 @@ import threading
 import vgamepad as vg
 
 from .gamepad_types import Button, Trigger, Stick, GamepadState
+from .gameinput_controller import GameInputController
 from .xinput_controller import XInputController, StandardGamepadTranslator, DpadToStickTranslator
 from .joycon_hid_controller import JoyCon, get_device_ids
 
 
 mod = Module()
 
+# -----------------------------------------------------------------------------
+# GameInput controller(s)
+# -----------------------------------------------------------------------------
+
+_gameinputs = []
+
+KNOWN_DEVICES = {
+    "razer_wolverine_ultimate": (0x1532, 0x0a14),
+    "mad_catz_sfiv_fightstick": (0x0738, 0x4718),
+}
+
+_gameinputs.append(GameInputController(KNOWN_DEVICES["razer_wolverine_ultimate"]))
+
+# -----------------------------------------------------------------------------
 # -----------------------------------------------------------------------------
 # XInput controller(s)
 # -----------------------------------------------------------------------------
@@ -27,8 +42,8 @@ standard_xbox_translator = StandardGamepadTranslator(
     apply_calibration=True,
 )
 
-_xinputs.append(XInputController(1, standard_xbox_translator))
-_xinputs.append(XInputController(2, DpadToStickTranslator()))
+#_xinputs.append(XInputController(1, standard_xbox_translator))
+#_xinputs.append(XInputController(2, DpadToStickTranslator()))
 
 # -----------------------------------------------------------------------------
 # Joy-Con controller(s)
@@ -124,21 +139,18 @@ def merge_states(states, external):
         for trigger in Trigger
     }
 
-    return GamepadState(
-        buttons=buttons,
-        sticks=sticks,
-        triggers=triggers,
-    )
+    return GamepadState(buttons=buttons, sticks=sticks, triggers=triggers)
 
 def poll_controller():
 
     global last_state
-    global _joycons
-    global _xinputs
+    global _gameinputs, _xinputs, _joycons
 
     physical_states = []
     disconnected = []
 
+    for gameinput in _gameinputs:
+        physical_states.append(gameinput.get_gamepad_state())
     for xinput in _xinputs:
         physical_states.append(xinput.read())
     for serial, joycon in list(_joycons.items()):

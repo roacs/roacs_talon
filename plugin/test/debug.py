@@ -2,7 +2,6 @@ from talon import Module, cron
 import time
 
 from .joycon_hid_controller import JoyCon, get_device_ids
-from .gamepad_types import print_gamepad_state
 
 mod = Module()
 
@@ -20,7 +19,7 @@ def poll_controller():
         if joycon.is_disconnected():
             disconnected.append(serial)
         else:
-            print_gamepad_state(joycon.get_gamepad_state())
+            print(joycon.get_gamepad_state())
 
     for serial in disconnected:
         joycon = _joycons.pop(serial, None)

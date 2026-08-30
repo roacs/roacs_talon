@@ -13,9 +13,8 @@ class GamepadNotFoundError(RuntimeError):
 class GameInputController:
     """A single Gamepad device, located by VID/PID at construction time."""
 
-    def __init__(self, vendor_id, product_id, allow_background_input=True):
-        self.vendor_id = vendor_id
-        self.product_id = product_id
+    def __init__(self, vid_pid_tuple, allow_background_input=True):
+        self.vendor_id, self.product_id = vid_pid_tuple
         self._gameinput = GI.create_gameinput()
         self._device = None
 
