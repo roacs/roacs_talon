@@ -132,7 +132,7 @@ def merge_states(states, external):
 
     triggers = {
         trigger: (
-            external.triggers[trigger]
+            Trigger.max_value()
             if external.triggers[trigger] > 0
             else max((state.triggers.get(trigger, 0) for state in states), default=0)
         )
@@ -228,12 +228,15 @@ class Actions:
             external_state.sticks[Stick.LX] = 0
             external_state.sticks[Stick.LY] = 0
 
-def increment_external_state(buttons):
+def increment_external_state(items):
     with external_state_lock:
-        for button in buttons:
-            external_state.buttons[button] += 1
+        for item in items:
+            d = external_state.triggers if isinstance(item, Trigger) else external_state.buttons
+            d[item] += 1
 
-def decrement_external_state(buttons):
+def decrement_external_state(items):
     with external_state_lock:
-        for button in buttons:
-            external_state.buttons[button] = max(0, external_state.buttons[button] - 1)
+        for item in items:
+            d = external_state.triggers if isinstance(item, Trigger) else external_state.buttons
+            d[item] = max(0, d[item] - 1)
+
