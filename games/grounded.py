@@ -79,11 +79,11 @@ class Actions:
 
     def footpedal_olympus_center_down():
         """pedal down"""
-        actions.skip()
+        actions.user.controller_button_down(Trigger.RIGHT)
 
     def footpedal_olympus_center_up():
         """pedal up"""
-        actions.skip()
+        actions.user.controller_button_up(Trigger.RIGHT)
 
     def footpedal_olympus_right_down():
         """pedal down"""

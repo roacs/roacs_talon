@@ -4,6 +4,7 @@ from enum import Enum
 class Character(str, Enum):
     LUMINARY_MERC_SUPPORT_329 = "luminary_merc_support_329"
     SLAYER_CYCLONE_329 = "slayer_cyclone_329"
+    GUARDIAN_STATIC_STRIKE = "guardian_static_strike"
 
 class Category(str, Enum):
     GEM = "gem"
@@ -12,7 +13,8 @@ class Category(str, Enum):
 
 # SELECTED CHARACTER
 #selected_character = Character.SLAYER_CYCLONE_329
-selected_character = Character.LUMINARY_MERC_SUPPORT_329
+#selected_character = Character.LUMINARY_MERC_SUPPORT_329
+selected_character = Character.GUARDIAN_STATIC_STRIKE
 
 # non-character specific regexes
 
@@ -54,6 +56,17 @@ CHARACTER_REGEXES = {
 
         Category.MAP:
             r'"!te of|ur$|kes$|\d+ e|t reg" "y: r"',
+    },
+
+    Character.GUARDIAN_STATIC_STRIKE: {
+        Category.GEM:
+            r'"ster at|^shockwave s|a-|ess su|cis|voc|od rag|akn|dati|^trin|osp|^ral|throw|^molten sh|d of p|lix|omation$|^ancestral ca|ld ch|^melee p|f ash$|leed s|bat s|rtion$|^fort|^elemental damage w"',
+
+        Category.VENDOR:
+            r'"-[rgbw]-|Runn|rint|s:.+ax"',
+
+        Category.MAP:
+            r'"!rate$|ur$|kes$"',
     },
 
     Character.SLAYER_CYCLONE_329: {
