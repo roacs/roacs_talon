@@ -3,22 +3,22 @@ import threading
 import vgamepad as vg
 
 from .gamepad_types import Button, Trigger, Stick, GamepadState
-from .gamepad_translator import Remap
+from .gamepad_translator import Remap, LX_NEG, LX_POS, LY_NEG, LY_POS
 from .gameinput_controller import GameInputController
-from .xinput_controller import XInputController, StandardGamepadTranslator, DpadToStickTranslator
+from .xinput_controller import XInputController
 from .joycon_hid_controller import JoyCon, get_device_ids
 
 
 mod = Module()
 
 # -----------------------------------------------------------------------------
-# GameInput controller(s)
+# Controller(s)
 # -----------------------------------------------------------------------------
 
-_gameinputs = []
+_controllers = []
 
-def add_gameinput(device, translator=None):
-    _gameinputs.append((GameInputController(device), translator))
+def add_controller(device, translator=None):
+    _controllers.append((device, translator))
 
 KNOWN_DEVICES = {
     "razer_wolverine_ultimate": (0x1532, 0x0a14),
@@ -26,33 +26,19 @@ KNOWN_DEVICES = {
     "navigation_controller_dshidmini": (0x045e, 0x02ff),
 }
 
-add_gameinput(KNOWN_DEVICES["razer_wolverine_ultimate"])
-add_gameinput(
-    KNOWN_DEVICES["navigation_controller_dshidmini"],
+add_controller(GameInputController(KNOWN_DEVICES["razer_wolverine_ultimate"]))
+add_controller(GameInputController(KNOWN_DEVICES["navigation_controller_dshidmini"]),
     Remap({Button.A: Button.BACK}),
 )
 
-# -----------------------------------------------------------------------------
-# -----------------------------------------------------------------------------
-# XInput controller(s)
-# -----------------------------------------------------------------------------
-
-_xinputs = []
-
-# TODO need to have a way of calibrating the stick and saving that calibration somewhere
-#      having to change them here manually is no bueno
-standard_xbox_translator = StandardGamepadTranslator(
-    centers={
-        Stick.LX: -1351,
-        Stick.LY: 0,
-        Stick.RX: -2240,
-        Stick.RY: -512,
-    },
-    apply_calibration=True,
-)
-
-#_xinputs.append(XInputController(1, standard_xbox_translator))
-#_xinputs.append(XInputController(2, DpadToStickTranslator()))
+#add_controller(XInputController(
+#    1,
+#    centers={Stick.LX: -1351, Stick.LY: 0, Stick.RX: -2240, Stick.RY: -512},
+#    apply_calibration=True,
+#))
+#add_controller(XInputController(2),
+#    Remap({Button.DPAD_LEFT:LX_NEG, Button.DPAD_RIGHT:LX_POS, Button.DPAD_UP:LY_POS, Button.DPAD_DOWN:LY_NEG})
+#)
 
 # -----------------------------------------------------------------------------
 # Joy-Con controller(s)
@@ -153,18 +139,17 @@ def merge_states(states, external):
 def poll_controller():
 
     global last_state
-    global _gameinputs, _xinputs, _joycons
+    global _controllers, _joycons
 
     physical_states = []
     disconnected = []
 
-    for gameinput, translator in _gameinputs:
-        state = gameinput.get_gamepad_state()
+    for device, translator in _controllers:
+        state = device.get_gamepad_state()
         if state is not None and translator is not None:
             state = translator(state)
         physical_states.append(state)
-    for xinput in _xinputs:
-        physical_states.append(xinput.read())
+
     for serial, joycon in list(_joycons.items()):
         physical_states.append(joycon.get_gamepad_state())
 

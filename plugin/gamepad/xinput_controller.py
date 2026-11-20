@@ -1,6 +1,5 @@
 import ctypes
 from ctypes import Structure, c_ubyte, c_ushort, c_short, c_ulong, POINTER
-from typing import Protocol
 from .gamepad_types import Button, Stick, Trigger, GamepadState, StickCalibration
 
 
@@ -120,31 +119,17 @@ SUBTYPE_NAMES = {
 }
 
 # ---------------------------------------------
-# Translator Interface
+# XInput Controller
 # ---------------------------------------------
 
-class GamepadTranslator(Protocol):
+class XInputController:
 
-    def translate(self, gamepad: XINPUT_GAMEPAD) -> GamepadState:
-        ...
-
-# ---------------------------------------------
-# Standard Gamepad Translator
-# ---------------------------------------------
-
-class StandardGamepadTranslator:
-
-    def __init__(self, centers=None, apply_calibration=False):
-        if centers is None:
-            centers = {
-                Stick.LX: 0,
-                Stick.LY: 0,
-                Stick.RX: 0,
-                Stick.RY: 0,
-            }
-
+    def __init__(self, index, centers=None, apply_calibration=False):
+        self.index = index
         self.apply_calibration = apply_calibration
+        self.state = XINPUT_STATE()
 
+        centers = centers or {}
         self.calibrations = {
             axis: StickCalibration(
                 center=centers.get(axis, 0),
@@ -154,7 +139,7 @@ class StandardGamepadTranslator:
             for axis in STICK_AXES
         }
 
-    def calibrate(self, value, calibration):
+    def _calibrate(self, value, calibration):
         if self.apply_calibration:
             offset = value - calibration.center
 
@@ -165,13 +150,20 @@ class StandardGamepadTranslator:
 
         return max(Stick.min_value(), min(Stick.max_value(), value))
 
-    def translate(self, gamepad):
+    def get_gamepad_state(self):
+        result = XInputGetState(self.index, ctypes.byref(self.state))
+
+        if result != ERROR_SUCCESS:
+            return None
+
+        gamepad = self.state.Gamepad
+
         buttons = {
             button: bool(gamepad.wButtons & mask) for button, mask in BUTTON_MASKS.items()
         }
 
         sticks = {
-            axis: self.calibrate(getattr(gamepad, field), self.calibrations[axis])
+            axis: self._calibrate(getattr(gamepad, field), self.calibrations[axis])
             for axis, field in STICK_AXES.items()
         }
 
@@ -180,57 +172,7 @@ class StandardGamepadTranslator:
             Trigger.RIGHT: gamepad.bRightTrigger,
         }
 
-        return GamepadState(
-            buttons=buttons,
-            sticks=sticks,
-            triggers=triggers,
-        )
-
-
-# ---------------------------------------------
-# Dpad As Analog Stick Translator (because fight stick joystick is a dpad)
-# ---------------------------------------------
-
-class DpadToStickTranslator(StandardGamepadTranslator):
-
-    def translate(self, gamepad):
-        state = super().translate(gamepad)
-
-        if gamepad.wButtons & BUTTON_MASKS[Button.DPAD_LEFT]:
-            state.sticks[Stick.LX] = Stick.min_value()
-        elif gamepad.wButtons & BUTTON_MASKS[Button.DPAD_RIGHT]:
-            state.sticks[Stick.LX] = Stick.max_value()
-
-        if gamepad.wButtons & BUTTON_MASKS[Button.DPAD_UP]:
-            state.sticks[Stick.LY] = Stick.max_value()
-        elif gamepad.wButtons & BUTTON_MASKS[Button.DPAD_DOWN]:
-            state.sticks[Stick.LY] = Stick.min_value()
-
-        state.buttons[Button.DPAD_UP] = False
-        state.buttons[Button.DPAD_DOWN] = False
-        state.buttons[Button.DPAD_LEFT] = False
-        state.buttons[Button.DPAD_RIGHT] = False
-
-        return state
-
-# ---------------------------------------------
-# XInput Controller
-# ---------------------------------------------
-
-class XInputController:
-
-    def __init__(self, index, translator):
-        self.index = index
-        self.translator = translator
-        self.state = XINPUT_STATE()
-
-    def read(self):
-        result = XInputGetState(self.index, ctypes.byref(self.state))
-
-        if result != ERROR_SUCCESS:
-            return None
-
-        return self.translator.translate(self.state.Gamepad)
+        return GamepadState(buttons=buttons, sticks=sticks, triggers=triggers)
 
 
 # ---------------------------------------------
