@@ -1,22 +1,20 @@
 from dataclasses import dataclass
-from typing import Callable, Iterable, Mapping
+from typing import Iterable, Mapping
 
-from .gamepad_types import Button, Trigger, Stick, GamepadState
+from .gamepad_types import Button, Trigger, Stick, GamepadState, StickCalibration
 
-# -----------------------------------------------------------------------------
-# A translator is anything that takes a GamepadState and returns a GamepadState.
-# -----------------------------------------------------------------------------
-GamepadStateTranslator = Callable[[GamepadState], GamepadState]
 
+# =============================================================================
+# StickDir: one direction of a stick, usable as a Remap target for a Button
+# =============================================================================
 
 @dataclass(frozen=True)
 class StickDir:
-    """One direction of a stick, usable as a Remap target for a Button source."""
     stick: Stick
     positive: bool
 
 
-# Convenience names so mappings read nicely: Button.DPAD_LEFT: LX_NEG
+# Convenience names so mappings read nicely: {Button.DPAD_LEFT: LX_NEG}
 LX_NEG, LX_POS = StickDir(Stick.LX, False), StickDir(Stick.LX, True)
 LY_NEG, LY_POS = StickDir(Stick.LY, False), StickDir(Stick.LY, True)
 RX_NEG, RX_POS = StickDir(Stick.RX, False), StickDir(Stick.RX, True)
@@ -29,6 +27,52 @@ def _targets(value):
     return (value,)
 
 
+# =============================================================================
+# CalibrateSticks: fix drifting stick centers (physical-axis correction)
+# =============================================================================
+
+class CalibrateSticks:
+    """
+    Re-center and rescale stick axes so a drifting center becomes 0.
+
+        CalibrateSticks({Stick.LX: -1351, Stick.RX: -2240})
+
+    Sticks not listed are untouched.
+    """
+
+    def __init__(self, centers: Mapping[Stick, int]):
+        self.calibrations = {}
+        for stick, center in centers.items():
+            if not (Stick.min_value() < center < Stick.max_value()):
+                raise ValueError(f"Calibration center for {stick} out of range: {center}")
+            self.calibrations[stick] = StickCalibration(
+                center=center,
+                negative_scale=Stick.min_value() / (Stick.min_value() - center),
+                positive_scale=Stick.max_value() / (Stick.max_value() - center),
+            )
+
+    def __call__(self, state: GamepadState) -> GamepadState:
+        sticks = dict(state.sticks)
+
+        for stick, cal in self.calibrations.items():
+            if stick not in sticks:
+                continue
+            offset = sticks[stick] - cal.center
+            scale = cal.positive_scale if offset >= 0 else cal.negative_scale
+            value = int(offset * scale)
+            sticks[stick] = max(Stick.min_value(), min(Stick.max_value(), value))
+
+        return GamepadState(
+            buttons=dict(state.buttons),
+            sticks=sticks,
+            triggers=dict(state.triggers),
+        )
+
+
+# =============================================================================
+# Remap: declarative input remapping
+# =============================================================================
+
 class Remap:
     """
     Declarative input remapping.
@@ -40,7 +84,7 @@ class Remap:
         Remap({Button.LB: Trigger.LEFT})                 # button -> full trigger
         Remap({Stick.LX: Stick.RX})                      # stick -> stick
         Remap({Button.DPAD_LEFT: LX_NEG})                # button -> stick direction
-        Remap({...}, invert=[Stick.LY])                  # flip a stick axis
+        Remap({}, invert=[Stick.LY])                     # flip a stick axis
 
     Rules:
       * Every mapped source is cleared first, then written to its targets,
@@ -79,7 +123,7 @@ class Remap:
         sticks = dict(state.sticks)
         triggers = dict(state.triggers)
 
-        # clear mapped sources
+        # clear all mapped sources
         for src in self.mapping:
             if isinstance(src, Button):
                 buttons[src] = False
@@ -88,7 +132,7 @@ class Remap:
             else:
                 sticks[src] = 0
 
-        # write to targets 
+        # write to targets
         for src, dsts in self.mapping.items():
             for dst in dsts:
                 if isinstance(dst, Button):
@@ -121,3 +165,23 @@ class Remap:
 
         return GamepadState(buttons=buttons, sticks=sticks, triggers=triggers)
 
+
+# =============================================================================
+# GamepadTranslator
+# =============================================================================
+
+class GamepadTranslator:
+    """
+    Calibration and then remap.
+    """
+
+    def __init__(self, calibration: CalibrateSticks = None, remap: Remap = None):
+        self.calibration = calibration
+        self.remap = remap
+
+    def __call__(self, state: GamepadState) -> GamepadState:
+        if self.calibration is not None:
+            state = self.calibration(state)
+        if self.remap is not None:
+            state = self.remap(state)
+        return state

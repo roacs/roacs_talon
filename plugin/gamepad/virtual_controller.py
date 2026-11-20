@@ -3,7 +3,7 @@ import threading
 import vgamepad as vg
 
 from .gamepad_types import Button, Trigger, Stick, GamepadState
-from .gamepad_translator import Remap, LX_NEG, LX_POS, LY_NEG, LY_POS
+from .gamepad_translator import GamepadTranslator, CalibrateSticks, Remap, LX_NEG, LX_POS, LY_NEG, LY_POS
 from .gameinput_controller import GameInputController
 from .xinput_controller import XInputController
 from .joycon_hid_controller import JoyCon, get_device_ids
@@ -17,7 +17,10 @@ mod = Module()
 
 _controllers = []
 
-def add_controller(device, translator=None):
+def add_controller(device, calibration=None, remap=None):
+    translator = None
+    if calibration is not None or remap is not None:
+        translator = GamepadTranslator(calibration=calibration, remap=remap)
     _controllers.append((device, translator))
 
 KNOWN_DEVICES = {
@@ -26,18 +29,27 @@ KNOWN_DEVICES = {
     "navigation_controller_dshidmini": (0x045e, 0x02ff),
 }
 
-add_controller(GameInputController(KNOWN_DEVICES["razer_wolverine_ultimate"]))
+razer_stick_calibration = CalibrateSticks({
+    Stick.LX: -1351, Stick.LY: 0, Stick.RX: -2240, Stick.RY: -512,
+})
+
+dpad_to_left_stick = Remap({
+    Button.DPAD_LEFT: LX_NEG, Button.DPAD_RIGHT: LX_POS,
+    Button.DPAD_UP: LY_POS,   Button.DPAD_DOWN: LY_NEG,
+})
+
+add_controller(GameInputController(KNOWN_DEVICES["razer_wolverine_ultimate"]),
+    calibration=razer_stick_calibration,
+)
 add_controller(GameInputController(KNOWN_DEVICES["navigation_controller_dshidmini"]),
-    Remap({Button.A: Button.BACK}),
+    remap=Remap({Button.A: Button.BACK}),
 )
 
-#add_controller(XInputController(
-#    1,
-#    centers={Stick.LX: -1351, Stick.LY: 0, Stick.RX: -2240, Stick.RY: -512},
-#    apply_calibration=True,
-#))
+#add_controller(XInputController(1),
+#    calibration=razer_stick_calibration,
+#)
 #add_controller(XInputController(2),
-#    Remap({Button.DPAD_LEFT:LX_NEG, Button.DPAD_RIGHT:LX_POS, Button.DPAD_UP:LY_POS, Button.DPAD_DOWN:LY_NEG})
+#    remap=dpad_to_left_stick,
 #)
 
 # -----------------------------------------------------------------------------

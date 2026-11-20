@@ -1,6 +1,6 @@
 import ctypes
 from ctypes import Structure, c_ubyte, c_ushort, c_short, c_ulong, POINTER
-from .gamepad_types import Button, Stick, Trigger, GamepadState, StickCalibration
+from .gamepad_types import Button, Stick, Trigger, GamepadState
 
 
 # ---------------------------------------------
@@ -124,33 +124,12 @@ SUBTYPE_NAMES = {
 
 class XInputController:
 
-    def __init__(self, index, centers=None, apply_calibration=False):
+    def __init__(self, index):
         self.index = index
-        self.apply_calibration = apply_calibration
         self.state = XINPUT_STATE()
 
-        centers = centers or {}
-        self.calibrations = {
-            axis: StickCalibration(
-                center=centers.get(axis, 0),
-                negative_scale=Stick.min_value() / (Stick.min_value() - centers.get(axis, 0)),
-                positive_scale=Stick.max_value() / (Stick.max_value() - centers.get(axis, 0)),
-            )
-            for axis in STICK_AXES
-        }
-
-    def _calibrate(self, value, calibration):
-        if self.apply_calibration:
-            offset = value - calibration.center
-
-            if offset >= 0:
-                value = int(offset * calibration.positive_scale)
-            else:
-                value = int(offset * calibration.negative_scale)
-
-        return max(Stick.min_value(), min(Stick.max_value(), value))
-
     def get_gamepad_state(self):
+        """Return the current GamepadState, or None if the controller is not connected."""
         result = XInputGetState(self.index, ctypes.byref(self.state))
 
         if result != ERROR_SUCCESS:
@@ -158,21 +137,20 @@ class XInputController:
 
         gamepad = self.state.Gamepad
 
-        buttons = {
-            button: bool(gamepad.wButtons & mask) for button, mask in BUTTON_MASKS.items()
-        }
-
-        sticks = {
-            axis: self._calibrate(getattr(gamepad, field), self.calibrations[axis])
-            for axis, field in STICK_AXES.items()
-        }
-
-        triggers = {
-            Trigger.LEFT: gamepad.bLeftTrigger,
-            Trigger.RIGHT: gamepad.bRightTrigger,
-        }
-
-        return GamepadState(buttons=buttons, sticks=sticks, triggers=triggers)
+        return GamepadState(
+            buttons={
+                button: bool(gamepad.wButtons & mask)
+                for button, mask in BUTTON_MASKS.items()
+            },
+            sticks={
+                axis: getattr(gamepad, field)
+                for axis, field in STICK_AXES.items()
+            },
+            triggers={
+                Trigger.LEFT: gamepad.bLeftTrigger,
+                Trigger.RIGHT: gamepad.bRightTrigger,
+            },
+        )
 
 
 # ---------------------------------------------

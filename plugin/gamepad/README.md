@@ -2,7 +2,7 @@
 * Install packages in Talon's python
     * C:\Program Files\Talon\python.exe -m pip install vgamepad
 
-* Install HidHide to hide the physical controller
+* Install HidHide to hide the physical controller(s)
     * Add Talon's python.exe, pythonw.exe, talon.exe, talon_console.exe to whitelist
     * Devices -> Enable device hiding, select to hide the physical controller
 
@@ -19,17 +19,18 @@ a dpad) into an approximation of an analog joystick.
 xinput_information useful for identifying which xinput indices have been assigned to physical devices.
 Open Talon Log and say 'print controller start'.  Press buttons on the controller and see which
 state changes.
-NOTE: XInput not recommended as those can move around
+NOTE: XInput not recommended as their indices can move around
 
 ### gameinput_controller.py, GameInput.py
 Uses Microsoft GameInput API and background service to read from devices.
 Exposes state of the physical controller through a dataclass GamepadState.
-Currently only works with Gamepad type.
+Allows selecting the device by VID/PID. Currently only works with Gamepad type.
 
 ### joycon_hid_controller.py
 Wrapper around joycon, mostly taken from tocoteron/joycon-python.
 Exposes state of the physical controller through a dataclass GamepadState.
 NOTE: The joycon implementation uses a background thread to keep the state up-to-date.
+NOTE: It sucks and it is laggy.
 
 ### virtual_controller.py
 Holds the instance of a virtual gamepad from vgamepad.  Polls the physical
@@ -37,6 +38,8 @@ controller(s) and keeps the state of the virtual controller in sync.
 Multiple physical devices can be polled and their outputs merged into one returned state.
 Adds Talon user actions that allow external actors (footpedal, noise, voice commands)
 to influence the state of the virtual controller.
+Translations and Stick calibrations can be applied to each physical device before being
+merged into the virtual state.
 
 ### voice_buttons.py/.talon
 Using voice phrases to push buttons on the virtual controller.
@@ -46,12 +49,7 @@ Using voice phrases to push buttons on the virtual controller.
   Perhaps with a GUI where you press buttons on the device to help select it
 * Add an auto-calibration to find joystick centers
 * Use packetNumber to determine if physical state has not changed instead of comparing objects
+* Fix Joy-Con's, or maybe get rid of them and rely on something like DS4Windows to turn them
+  into something easier.
 * goal: 
-  - Move translation to the virtual_controller level and go from GamepadState -> GamepadState
-    allows changing joycon buttons to xbox layout
-    allows changing fight stick dpads into analog stick
-    allows changing right joycon stick into a left joycon stick
-  - Make each type of controller implement an interface to get_gamepad_state and keep them all in one
-    dict/list that also has StickCalibration and Translation
   - May need to abstract the controller buttons to east/west/north/south to use nintendo/playstation
-  - minimize the joycon code
