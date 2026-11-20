@@ -117,11 +117,11 @@ class Actions:
 
     def footpedal_ikkegol_dual_right_down():
         """pedal down"""
-        pass
+        actions.user.controller_button_down(Button.X)
 
     def footpedal_ikkegol_dual_right_up():
         """pedal up"""
-        pass
+        actions.user.controller_button_up(Button.X)
 
     def footpedal_ikkegol_single_down():
         """pedal down"""

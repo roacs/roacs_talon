@@ -61,5 +61,5 @@ class Actions:
 
     def gameinput_devices():
         """Print connected GameInput devices."""
-        global _controller
-        _controller.print_devices()
+        global _gameinput_controller
+        _gameinput_controller.print_devices()

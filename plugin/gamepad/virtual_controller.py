@@ -3,6 +3,7 @@ import threading
 import vgamepad as vg
 
 from .gamepad_types import Button, Trigger, Stick, GamepadState
+from .gamepad_translator import Remap
 from .gameinput_controller import GameInputController
 from .xinput_controller import XInputController, StandardGamepadTranslator, DpadToStickTranslator
 from .joycon_hid_controller import JoyCon, get_device_ids
@@ -16,12 +17,20 @@ mod = Module()
 
 _gameinputs = []
 
+def add_gameinput(device, translator=None):
+    _gameinputs.append((GameInputController(device), translator))
+
 KNOWN_DEVICES = {
     "razer_wolverine_ultimate": (0x1532, 0x0a14),
     "mad_catz_sfiv_fightstick": (0x0738, 0x4718),
+    "navigation_controller_dshidmini": (0x045e, 0x02ff),
 }
 
-_gameinputs.append(GameInputController(KNOWN_DEVICES["razer_wolverine_ultimate"]))
+add_gameinput(KNOWN_DEVICES["razer_wolverine_ultimate"])
+add_gameinput(
+    KNOWN_DEVICES["navigation_controller_dshidmini"],
+    Remap({Button.A: Button.BACK}),
+)
 
 # -----------------------------------------------------------------------------
 # -----------------------------------------------------------------------------
@@ -149,8 +158,11 @@ def poll_controller():
     physical_states = []
     disconnected = []
 
-    for gameinput in _gameinputs:
-        physical_states.append(gameinput.get_gamepad_state())
+    for gameinput, translator in _gameinputs:
+        state = gameinput.get_gamepad_state()
+        if state is not None and translator is not None:
+            state = translator(state)
+        physical_states.append(state)
     for xinput in _xinputs:
         physical_states.append(xinput.read())
     for serial, joycon in list(_joycons.items()):

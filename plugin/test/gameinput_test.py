@@ -55,7 +55,8 @@ class GameInputController:
 
     def __init__(self, dll_path=GI.GAMEINPUT_REDIST_PATH, allow_background_input=True, ignored_devices=None):
         self._dll = GI.load_dll(dll_path)
-        self._gameinput = GI.create_gameinput(self._dll)
+        self._gameinput = GI.create_gameinput()
+        #self._gameinput = GI.create_gameinput(self._dll)
         self._devices = []
         self._ignored_devices = set(ignored_devices or [])
 
