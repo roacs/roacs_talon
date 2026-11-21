@@ -1,8 +1,7 @@
 from talon import Module, cron
-import threading
 import vgamepad as vg
 
-from .gamepad_types import Button, Trigger, Stick, GamepadState
+from .gamepad_types import Button, Trigger, Stick, GamepadState, ExternalInput
 from .gamepad_translator import GamepadTranslator, CalibrateSticks, Remap, LX_NEG, LX_POS, LY_NEG, LY_POS
 from .gameinput_controller import GameInputController
 from .xinput_controller import XInputController
@@ -99,18 +98,10 @@ virtual_button_map = {
 }
 
 # -----------------------------------------------------------------------------
-# Inputs External from the physical controller
-# Counters are used for buttons/triggers and values for sticks
+# Inputs external to the physical controllers
 # -----------------------------------------------------------------------------
 
-external_state = GamepadState(
-    buttons={button: 0 for button in Button},
-    sticks={stick: 0 for stick in Stick},
-    triggers={trigger: 0 for trigger in Trigger},
-)
-
-external_state_lock = threading.Lock()
-
+external_input = ExternalInput()
 
 # -----------------------------------------------------------------------------
 # Poll Controllers and update ViGEm 
@@ -118,30 +109,32 @@ external_state_lock = threading.Lock()
 
 last_state = None
 
-def merge_states(states, external):
-    states = [state for state in states if state is not None]
-    if not states:
-        return external
+def merge_states(physical_states, external):
+    """
+    Combine physical controller states with the external state into one full GamepadState.
+    """
+    states = [state for state in physical_states if state is not None]
 
     buttons = {
-        button: any(state.buttons.get(button, False) for state in states) or external.buttons[button] > 0
+        button: any(state.buttons.get(button, False) for state in states)
+                or external.buttons.get(button, False)
         for button in Button
     }
 
-    sticks = {
-        stick: (
-            external.sticks[stick]
-            if external.sticks[stick] != 0
-            else max((state.sticks.get(stick, 0) for state in states), key=abs, default=0)
-        )
-        for stick in Stick
-    }
+    sticks = {}
+    for stick in Stick:
+        external_value = external.sticks.get(stick, 0)
+        if external_value != 0:
+            sticks[stick] = external_value
+        else:
+            sticks[stick] = max(
+                (state.sticks.get(stick, 0) for state in states), key=abs, default=0
+            )
 
     triggers = {
-        trigger: (
-            Trigger.max_value()
-            if external.triggers[trigger] > 0
-            else max((state.triggers.get(trigger, 0) for state in states), default=0)
+        trigger: max(
+            [external.triggers.get(trigger, 0)]
+            + [state.triggers.get(trigger, 0) for state in states]
         )
         for trigger in Trigger
     }
@@ -149,12 +142,13 @@ def merge_states(states, external):
     return GamepadState(buttons=buttons, sticks=sticks, triggers=triggers)
 
 def poll_controller():
-
+    """
+    Poll physical controllers and merge with external input.  Update virtual controller.
+    """
     global last_state
     global _controllers, _joycons
 
     physical_states = []
-    disconnected = []
 
     for device, translator in _controllers:
         state = device.get_gamepad_state()
@@ -165,14 +159,7 @@ def poll_controller():
     for serial, joycon in list(_joycons.items()):
         physical_states.append(joycon.get_gamepad_state())
 
-    with external_state_lock:
-        external = GamepadState(
-            buttons=external_state.buttons.copy(),
-            sticks=external_state.sticks.copy(),
-            triggers=external_state.triggers.copy(),
-        )
-
-    merged_state = merge_states(physical_states, external)
+    merged_state = merge_states(physical_states, external_input.to_gamepad_state())
 
     if merged_state == last_state:
         return
@@ -205,11 +192,11 @@ class Actions:
 
     def controller_button_down(button: Button | Trigger):
         """Press virtual controller button."""
-        increment_external_state([button])
+        external_input.press([button])
 
     def controller_button_up(button: Button | Trigger):
         """Release virtual controller button."""
-        decrement_external_state([button])
+        external_input.release([button])
 
     def controller_button_press(buttons: list[Button | Trigger]):
         """Press virtual controller buttons."""
@@ -219,33 +206,13 @@ class Actions:
             buttons = [buttons]
 
         if buttons:
-            increment_external_state(buttons)
-            cron.after("30ms", lambda: decrement_external_state(buttons))
+            external_input.press(buttons)
+            cron.after("30ms", lambda: external_input.release(buttons))
 
     def controller_left_stick(x: int, y: int):
         """Move the left analog stick. Physical input disabled until controller_left_stick_clear called."""
-        x = max(Stick.min_value(), min(Stick.max_value(), x))
-        y = max(Stick.min_value(), min(Stick.max_value(), y))
-
-        with external_state_lock:
-            external_state.sticks[Stick.LX] = x
-            external_state.sticks[Stick.LY] = y
+        external_input.set_stick(Stick.LX, Stick.LY, x, y)
 
     def controller_left_stick_clear():
         """Return left stick control to the physical controller."""
-        with external_state_lock:
-            external_state.sticks[Stick.LX] = 0
-            external_state.sticks[Stick.LY] = 0
-
-def increment_external_state(items):
-    with external_state_lock:
-        for item in items:
-            d = external_state.triggers if isinstance(item, Trigger) else external_state.buttons
-            d[item] += 1
-
-def decrement_external_state(items):
-    with external_state_lock:
-        for item in items:
-            d = external_state.triggers if isinstance(item, Trigger) else external_state.buttons
-            d[item] = max(0, d[item] - 1)
-
+        external_input.clear_stick(Stick.LX, Stick.LY)
